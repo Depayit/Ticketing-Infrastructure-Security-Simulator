@@ -1,0 +1,45 @@
+﻿<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ThaiTicket Major — Seat Selection</title>
+  <link rel="stylesheet" href="/static/ttm.css" />
+  <script src="/static/event-config.js"></script>
+  <script src="/static/telemetry.js"></script>
+  <script src="/static/funnel-guard.js"></script>
+  <script src="/static/ttm-ui.js"></script>
+</head>
+<body>
+  <header class="ttm-header">
+    <div class="ttm-logo">
+      <div class="ttm-logo-main">
+        <span class="ttm-logo-badge">TTM</span>
+        <span>THAITICKET MAJOR</span>
+      </div>
+      <span class="ttm-logo-sub">a ticketmaster company</span>
+    </div>
+  </header>
+
+  <main class="ttm-main ttm-main-left">
+    <div class="nav-links">
+      <a href="/">← ห้องรอ</a>
+      <a href="/admin">Defense Admin</a>
+    </div>
+
+    <h1 class="ttm-event-title" id="event-name"></h1>
+    <p class="ttm-copy">เลือกที่นั่ง — Layer 3 (AI) วัดพฤติกรรม mouse/scroll/hover ผ่าน Telemetry</p>
+    <p id="purchase-timer" class="purchase-timer"></p>
+
+    <div id="defense-msg" class="alert-banner hidden"></div>
+
+    <div class="seats-grid" id="seats"></div>
+
+    <p id="status-msg" class="ttm-copy"></p>
+    <button id="btn-checkout" class="ttm-btn" disabled>ไปชำระเงิน</button>
+  </main>
+
+  <footer class="ttm-footer"></footer>
+  <script src="/static/seat-map.js"></script>
+</body>
+</html>

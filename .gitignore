@@ -1,0 +1,8 @@
+.venv/
+.venv-1/
+**/__pycache__/
+**/node_modules/
+**/dist/
+*.log
+.tunnel-url
+*.png

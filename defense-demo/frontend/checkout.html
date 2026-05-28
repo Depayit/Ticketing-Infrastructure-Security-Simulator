@@ -1,0 +1,75 @@
+﻿<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ThaiTicket Major — Checkout</title>
+  <link rel="stylesheet" href="/static/ttm.css" />
+  <script src="/static/event-config.js"></script>
+  <script src="/static/telemetry.js"></script>
+  <script src="/static/funnel-guard.js"></script>
+  <script src="/static/ttm-ui.js"></script>
+</head>
+<body>
+  <header class="ttm-header">
+    <div class="ttm-logo">
+      <div class="ttm-logo-main">
+        <span class="ttm-logo-badge">TTM</span>
+        <span>THAITICKET MAJOR</span>
+      </div>
+      <span class="ttm-logo-sub">a ticketmaster company</span>
+    </div>
+  </header>
+
+  <main class="ttm-main ttm-main-left">
+    <div class="nav-links">
+      <a href="/seats">← เลือกที่นั่ง</a>
+      <a href="/admin">Defense Admin</a>
+    </div>
+
+    <h1 class="ttm-event-title" id="event-name"></h1>
+    <p class="ttm-copy">ชำระเงิน + Layer 4 (3-D Secure) — OTP demo: <strong>123456</strong></p>
+    <p id="purchase-timer" class="purchase-timer"></p>
+
+    <div class="checkout-steps">
+      <div class="step-pill active" id="step-pill-1">1. ชำระเงิน</div>
+      <div class="step-pill" id="step-pill-2">2. 3-D Secure</div>
+      <div class="step-pill" id="step-pill-3">3. สำเร็จ</div>
+    </div>
+
+    <div id="defense-msg" class="alert-banner hidden"></div>
+
+    <div id="panel-pay" class="panel-card">
+      <h2>ข้อมูลการชำระเงิน</h2>
+      <div class="form-group">
+        <label for="buyer-email">อีเมล</label>
+        <input id="buyer-email" type="email" value="fan@example.com" />
+      </div>
+      <div class="form-group">
+        <label for="card-number">หมายเลขบัตร</label>
+        <input id="card-number" type="text" value="4111111111111111" />
+      </div>
+      <button id="btn-pay" class="ttm-btn">Checkout</button>
+    </div>
+
+    <div id="panel-3ds" class="panel-card hidden">
+      <h2>3-D Secure Verification</h2>
+      <p class="ttm-copy">กรอก OTP จากธนาคาร (Payment Service ตรวจ carding)</p>
+      <div class="form-group">
+        <label for="otp">OTP</label>
+        <input id="otp" type="text" placeholder="123456" maxlength="6" />
+      </div>
+      <button id="btn-verify" class="ttm-btn">ยืนยัน OTP</button>
+    </div>
+
+    <div id="panel-success" class="panel-card hidden">
+      <h2>ชำระเงินสำเร็จ</h2>
+      <p id="order-result" class="ttm-copy"></p>
+      <a href="/" class="ttm-btn">กลับหน้าแรก</a>
+    </div>
+  </main>
+
+  <footer class="ttm-footer"></footer>
+  <script src="/static/checkout.js"></script>
+</body>
+</html>

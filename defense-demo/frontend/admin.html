@@ -1,0 +1,263 @@
+﻿<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Defense Admin — Swiss Cheese Audit</title>
+  <link rel="stylesheet" href="/static/ttm.css" />
+  <script src="/static/event-config.js"></script>
+  <script src="/static/ttm-ui.js"></script>
+  <style>
+    .admin-wrap { max-width: 1280px; margin: 0 auto; padding: 24px; }
+    .admin-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 12px;
+      flex: 1;
+      min-width: 280px;
+    }
+    .stat-card {
+      border-radius: 12px;
+      padding: 14px 16px;
+      border: 1px solid var(--border-light);
+      background: #fafafa;
+    }
+    .stat-card .label { font-size: 12px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.04em; }
+    .stat-card .value { font-size: 28px; font-weight: 800; margin-top: 4px; }
+    .stat-card.passed .value { color: var(--success); }
+    .stat-card.blocked .value { color: var(--danger); }
+    .stat-card.total .value { color: var(--ttm-blue); }
+    .filter-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+    .filter-tabs button {
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border-light);
+      background: #fff;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+    }
+    .filter-tabs button.active { background: var(--ttm-blue); color: #fff; border-color: var(--ttm-blue); }
+    .filter-tabs button.tab-pass.active { background: var(--success); border-color: var(--success); }
+    .filter-tabs button.tab-fail.active { background: var(--danger); border-color: var(--danger); }
+    .btn-clear {
+      padding: 10px 18px;
+      border-radius: 8px;
+      border: none;
+      background: var(--danger);
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .btn-clear:hover { filter: brightness(1.08); }
+    .btn-clear:disabled { opacity: 0.5; cursor: not-allowed; }
+    .table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border-light); }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; }
+    th, td { border-bottom: 1px solid #e5e7eb; padding: 10px 12px; text-align: left; }
+    th { background: #f3f4f6; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary); }
+    tr.row-pass { background: #f0fdf4; }
+    tr.row-fail { background: #fef2f2; }
+    tr.layer-ip td:first-child { border-left: 4px solid #f59e0b; }
+    tr.layer-ai td:first-child { border-left: 4px solid #ec4899; }
+    tr.layer-3ds td:first-child { border-left: 4px solid #10b981; }
+    tr.layer-queue td:first-child { border-left: 4px solid #3b82f6; }
+    tr.layer-akamai td:first-child { border-left: 4px solid #8b5cf6; }
+    tr.layer-edge td:first-child { border-left: 4px solid #06b6d4; }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .badge-pass { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+    .badge-fail { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+    .action-fail { color: #991b1b; font-weight: 600; }
+    .empty-msg { text-align: center; padding: 48px; color: var(--text-muted); }
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 12px 20px;
+      border-radius: 8px;
+      background: #1f2937;
+      color: #fff;
+      font-size: 13px;
+      z-index: 100;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }
+  </style>
+</head>
+<body>
+  <header class="ttm-header">
+    <div class="ttm-logo">
+      <div class="ttm-logo-main">
+        <span class="ttm-logo-badge">TTM</span>
+        <span>DEFENSE ADMIN</span>
+      </div>
+      <span class="ttm-logo-sub">Swiss Cheese Model — Live Audit</span>
+    </div>
+  </header>
+
+  <div class="admin-wrap">
+    <div class="nav-links" style="justify-content:flex-start;">
+      <a href="/">← Waiting Room</a>
+      <a href="/seats">Seat Map</a>
+      <a href="/checkout">Checkout</a>
+    </div>
+    <h1 id="event-name" class="ttm-event-title" style="text-align:left;"></h1>
+    <p class="ttm-copy" style="text-align:left;">Real-time events จาก Edge · IP · Akamai · Queue · AI · 3DS</p>
+
+    <div class="admin-toolbar">
+      <div class="stats-grid">
+        <div class="stat-card total">
+          <div class="label">ทั้งหมด</div>
+          <div class="value" id="stat-total">0</div>
+        </div>
+        <div class="stat-card passed">
+          <div class="label">ผ่าน</div>
+          <div class="value" id="stat-passed">0</div>
+        </div>
+        <div class="stat-card blocked">
+          <div class="label">ไม่ผ่าน (บล็อก)</div>
+          <div class="value" id="stat-blocked">0</div>
+        </div>
+      </div>
+      <button type="button" class="btn-clear" id="btn-clear-all">ล้างข้อมูลทั้งหมด</button>
+    </div>
+
+    <div class="filter-tabs" style="margin-bottom:16px;">
+      <button type="button" class="active" data-filter="all">ทั้งหมด</button>
+      <button type="button" class="tab-pass" data-filter="pass">ผ่าน</button>
+      <button type="button" class="tab-fail" data-filter="fail">ไม่ผ่าน</button>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>เวลา</th>
+            <th>สถานะ</th>
+            <th>Layer</th>
+            <th>Action</th>
+            <th>IP</th>
+            <th>Detail</th>
+          </tr>
+        </thead>
+        <tbody id="rows">
+          <tr><td colspan="6" class="empty-msg">กำลังโหลด...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer class="ttm-footer"></footer>
+  <div id="toast" class="toast hidden"></div>
+  <script>
+    TTMUI.renderDefenseFooter(false);
+    TTMUI.setPageTitle("Admin");
+    document.getElementById("event-name").textContent = window.TTM_EVENT?.name || "";
+
+    let currentFilter = "all";
+    let allEvents = [];
+
+    function showToast(msg) {
+      const el = document.getElementById("toast");
+      el.textContent = msg;
+      el.classList.remove("hidden");
+      setTimeout(() => el.classList.add("hidden"), 3500);
+    }
+
+    function filterEvents(events) {
+      if (currentFilter === "pass") return events.filter((e) => !e.blocked);
+      if (currentFilter === "fail") return events.filter((e) => e.blocked);
+      return events;
+    }
+
+    function renderRows(events) {
+      const filtered = filterEvents(events);
+      const tbody = document.getElementById("rows");
+      if (!filtered.length) {
+        const label = currentFilter === "pass" ? "ผ่าน" : currentFilter === "fail" ? "ไม่ผ่าน" : "";
+        tbody.innerHTML = `<tr><td colspan="6" class="empty-msg">ไม่มีเหตุการณ์${label ? " (" + label + ")" : ""}</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = filtered.map((e) => {
+        const layer = (e.layer || "").replace("3ds", "3ds");
+        const pass = !e.blocked;
+        const rowClass = pass ? "row-pass" : "row-fail";
+        const badge = pass
+          ? '<span class="badge badge-pass">ผ่าน</span>'
+          : '<span class="badge badge-fail">ไม่ผ่าน</span>';
+        return `<tr class="${rowClass} layer-${layer}">
+          <td>${new Date(e.ts * 1000).toLocaleTimeString("th-TH")}</td>
+          <td>${badge}</td>
+          <td>${e.layer || "-"}</td>
+          <td class="${pass ? "" : "action-fail"}">${e.action}</td>
+          <td>${e.ip || "-"}</td>
+          <td><code>${JSON.stringify(e.detail || {}).slice(0, 120)}</code></td>
+        </tr>`;
+      }).join("");
+    }
+
+    function updateStats(stats) {
+      document.getElementById("stat-total").textContent = stats.total ?? 0;
+      document.getElementById("stat-passed").textContent = stats.passed ?? 0;
+      document.getElementById("stat-blocked").textContent = stats.blocked ?? 0;
+    }
+
+    async function refresh() {
+      try {
+        const res = await fetch("/admin/api/events?limit=200");
+        const data = await res.json();
+        allEvents = data.events || [];
+        updateStats(data.stats || { total: 0, passed: 0, blocked: 0 });
+        renderRows(allEvents);
+      } catch (e) {
+        console.warn("refresh failed", e);
+      }
+    }
+
+    document.querySelectorAll(".filter-tabs button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".filter-tabs button").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentFilter = btn.dataset.filter;
+        renderRows(allEvents);
+      });
+    });
+
+    document.getElementById("btn-clear-all").addEventListener("click", async () => {
+      if (!confirm("ล้างข้อมูล Defense ทั้งหมด?\n\nรวม audit log, คิว, ที่นั่ง, cart, session, ban — ไม่สามารถย้อนกลับได้")) return;
+      const btn = document.getElementById("btn-clear-all");
+      btn.disabled = true;
+      try {
+        const res = await fetch("/admin/api/clear-all", { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "clear failed");
+        allEvents = [];
+        updateStats({ total: 0, passed: 0, blocked: 0 });
+        renderRows([]);
+        showToast("ล้างข้อมูลแล้ว (" + (data.deleted_keys || 0) + " keys)");
+        await refresh();
+      } catch (e) {
+        showToast("ล้างข้อมูลไม่สำเร็จ: " + (e.message || e));
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    refresh();
+    setInterval(refresh, 2000);
+  </script>
+</body>
+</html>

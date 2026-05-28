@@ -1,0 +1,78 @@
+﻿version: "3.9"
+
+services:
+  defense-redis:
+    image: redis:7-alpine
+    container_name: defense-redis
+    ports:
+      - "6380:6379"
+
+  fraud-engine:
+    build: .
+    container_name: defense-fraud
+    working_dir: /app/fraud-engine
+    command: uvicorn main:app --host 0.0.0.0 --port 8094
+    environment:
+      - AI_LAYER_ENABLED=true
+    ports:
+      - "8094:8094"
+
+  queue-service:
+    build: .
+    container_name: defense-queue
+    working_dir: /app/queue-service
+    command: uvicorn main:app --host 0.0.0.0 --port 8091
+    environment:
+      - REDIS_URL=redis://defense-redis:6379/0
+    depends_on:
+      - defense-redis
+    ports:
+      - "8091:8091"
+
+  seat-service:
+    build: .
+    container_name: defense-seat
+    working_dir: /app/seat-service
+    command: uvicorn main:app --host 0.0.0.0 --port 8092
+    environment:
+      - REDIS_URL=redis://defense-redis:6379/0
+      - FRAUD_ENGINE_URL=http://fraud-engine:8094
+    depends_on:
+      - defense-redis
+      - fraud-engine
+    ports:
+      - "8092:8092"
+
+  payment-service:
+    build: .
+    container_name: defense-payment
+    working_dir: /app/payment-service
+    command: uvicorn main:app --host 0.0.0.0 --port 8093
+    environment:
+      - REDIS_URL=redis://defense-redis:6379/0
+      - FRAUD_ENGINE_URL=http://fraud-engine:8094
+      - THREE_DS_OTP=123456
+    depends_on:
+      - defense-redis
+      - fraud-engine
+    ports:
+      - "8093:8093"
+
+  gateway:
+    build: .
+    container_name: defense-gateway
+    working_dir: /app/gateway
+    command: uvicorn main:app --host 0.0.0.0 --port 8090
+    environment:
+      - REDIS_URL=redis://defense-redis:6379/0
+      - QUEUE_SERVICE_URL=http://queue-service:8091
+      - SEAT_SERVICE_URL=http://seat-service:8092
+      - PAYMENT_SERVICE_URL=http://payment-service:8093
+    depends_on:
+      - defense-redis
+      - queue-service
+      - seat-service
+      - payment-service
+      - fraud-engine
+    ports:
+      - "8090:8090"

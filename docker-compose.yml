@@ -1,0 +1,58 @@
+version: '3.9'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: ttm-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  proxy-rotator:
+    build:
+      context: ./proxy-rotator
+      dockerfile: Dockerfile
+    container_name: ttm-proxy-rotator
+    ports:
+      - "8001:8080"
+    depends_on:
+      - redis
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    restart: unless-stopped
+
+  manager:
+    build:
+      context: .
+      dockerfile: ./manager/Dockerfile
+    container_name: ttm-manager
+    ports:
+      - "8080:8080"
+    depends_on:
+      - redis
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - PROXY_ROTATOR_URL=http://proxy-rotator:8080
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    depends_on:
+      - redis
+      - proxy-rotator
+    deploy:
+      replicas: 8
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - PROXY_ROTATOR_URL=http://proxy-rotator:8080
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+

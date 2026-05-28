@@ -1,0 +1,140 @@
+คู่มือการใช้งานบอทกดบัตร ThaiTicketMajor 2026 (Production Version)
+================================================================
+
+วันที่สร้าง: 24 พฤษภาคม 2026
+เวอร์ชัน: 2.0 (Manager/Worker + Dashboard + GraphQL + Auto CAPTCHA)
+
+1. คำเตือนสำคัญ
+--------------------
+- บอทนี้ใช้สำหรับการศึกษาระบบอัตโนมัติและการพัฒนาเท่านั้น
+- การใช้บอทอาจผิดเงื่อนไขการใช้งานของ ThaiTicketMajor
+- ผู้ใช้งานต้องรับผิดชอบเองทั้งหมด
+- ควรใช้ Residential Proxy ไทยคุณภาพสูงเท่านั้น
+- แนะนำให้ทดสอบกับ event เล็ก ๆ ก่อน
+
+2. ความต้องการของระบบ
+------------------------
+- Docker + Docker Compose (แนะนำ Docker Swarm สำหรับหลายเครื่อง)
+- Python 3.11+
+- Redis (สำหรับ coordination ระหว่าง worker)
+- 2Captcha / CapMonster API Key
+- Telegram Bot Token + Chat ID
+- Residential Proxy ไทย (ยิ่งมากยิ่งดี อย่างน้อย 20-50 ตัว)
+- VPS หลายเครื่อง (แนะนำ 5-20 เครื่อง) สำหรับ production
+
+3. โครงสร้างโฟลเดอร์
+----------------------
+TTM-BOT-2026/
+├── manager/
+│   ├── main.py
+│   ├── config.json
+│   ├── Dockerfile
+│   └── static/                  ← ไฟล์ React ที่ build แล้ว
+├── worker/
+│   ├── bot.py
+│   ├── config.json
+│   └── Dockerfile
+├── frontend/                     ← โฟลเดอร์พัฒนา React (TypeScript)
+├── docker-compose.yml
+├── ansible-deploy.yml
+├── README.md
+└── redis.conf
+
+4. การติดตั้ง (Step by Step)
+----------------------------
+
+##ขั้นตอนที่ 1: ติดตั้งบนเครื่อง Manager
+---------------------------------
+1. สร้างโฟลเดอร์โปรเจกต์และคัดลอกไฟล์ทั้งหมดตามโครงสร้าง
+2. เข้าไปที่โฟลเดอร์ frontend แล้วรัน:
+   npm install
+   npm run build
+3. คัดลอกโฟลเดอร์ dist/ ไปวางที่ manager/static/
+##ขั้นตอนที่ 2: ตั้งค่า config
+-------------------------
+**worker/config.json**
+{
+  "event_id": "ttm-bkk-blackpink-world-tour-2026",
+  "telegram_token": "YOUR_TELEGRAM_BOT_TOKEN",
+  "telegram_chat_id": "YOUR_CHAT_ID",
+  "captcha_key": "YOUR_2CAPTCHA_KEY",
+  "redis_url": "redis://redis:6379/0",
+  "proxies": ["http://user:pass@proxy1:8000", "http://user:pass@proxy2:8000"],
+  "profiles": [
+    {
+      "fullname": "ชื่อ นามสกุล",
+      "email": "email@gmail.com",
+      "phone": "0812345678",
+      "id_card": "1234567890123",
+      "card": {"number": "4111111111111111", "exp": "1228", "cvv": "123"}
+    }
+  ],
+  "ticket_priorities": ["VIP", "GA", "Standing"]
+}
+
+**manager/config.json** (ส่วนใหญ่ใช้ Redis เป็นหลัก)
+
+###ขั้นตอนที่ 3: รันด้วย Docker
+-------------------------
+cd TTM-BOT-2026
+docker compose up -d --build
+
+หรือใช้ Swarm:
+docker stack deploy -c docker-compose.yml ttm-bot
+
+###5. การใช้งาน
+--------------
+
+ผ่าน Dashboard:
+- เปิดเบราว์เซอร์เข้า http://YOUR_MANAGER_IP:8080
+- กดปุ่ม "START ALL WORKERS" เพื่อเริ่มบอททุกเครื่อง
+- กด "STOP ALL WORKERS" เพื่อหยุดทันที
+- สามารถดู Log แบบเรียลไทม์ได้
+
+ผ่าน Telegram:
+- เมื่อมี worker สำเร็จจะแจ้งเตือนอัตโนมัติ
+- สามารถใช้คำสั่ง /start และ /stop ผ่าน Central Controller (ถ้าเปิดใช้งาน)
+
+###6. คำแนะนำสำคัญ (Best Practices)
+--------------------------------
+1. ใช้ Residential Proxy ไทยคุณภาพสูงเท่านั้น (หมุนทุก 5-15 วินาที)
+2. ควรมี Proxy อย่างน้อย 1 ตัวต่อ 1-2 worker
+3. ใช้ Profile + Card หมุนเวียน (ยิ่งมากยิ่งดี)
+4. เปิดบอทก่อนเวลาเปิดขายประมาณ 30-60 วินาที
+5. ใช้หลาย VPS (กระจายไปหลาย Provider และหลายประเทศ)
+6. Monitor Dashboard + Telegram อย่างใกล้ชิด
+7. GraphQL Endpoint อาจเปลี่ยนทุก event ใหญ่ ควร capture ใหม่ก่อนวันขาย
+8. Queue-it + Turnstile CAPTCHA เป็นจุดสำคัญที่สุด — ต้องมี Solver ที่เร็ว
+9. อย่าใช้ Datacenter Proxy จะถูกบล็อกทันที
+10. เมื่อมี worker สำเร็จ ระบบจะหยุดทุกเครื่องอัตโนมัติผ่าน Redis
+
+##7. การแก้ปัญหา (Troubleshooting)
+--------------------------------
+- Error "Connection refused" → เช็ค Redis และ Proxy
+- CAPTCHA ไม่แก้ → ตรวจสอบ API Key ของ 2Captcha
+- Worker ไม่ขึ้นใน Dashboard → เช็ค Redis connection
+- ถูก Block → เปลี่ยน Proxy + Profile ชุดใหม่
+- Queue ไม่ผ่าน → เพิ่มเวลา poll หรือปรับ solver
+
+##8. การอัปเดต
+--------------
+- Endpoint และ Mutation ของ ThaiTicketMajor เปลี่ยนบ่อย
+- ควร capture GraphQL จาก Chrome DevTools ทุกครั้งก่อน event ใหญ่
+- อัปเดต User-Agent และ Header ให้ตรงกับปี 2026
+
+##9. คำแนะนำเพิ่มเติม
+--------------------
+- รันบนเครื่องที่มีความเร็วอินเทอร์เน็ตสูงและ latency ต่ำ
+- ใช้ tmux หรือ Docker Swarm สำหรับความเสถียร
+- เก็บ log ทุกครั้งที่รัน
+- ทดสอบระบบหลายครั้งก่อน event จริง
+
+จบคู่มือการใช้งาน
+================================================================
+พัฒนาเพื่อการศึกษาและทดสอบระบบอัตโนมัติ
+ใช้งานด้วยความระมัดระวัง
+
+License
+พัฒนาโดย Jacob Nuttapong
+เวอร์ชัน: 2026.05 Production Grade
+อัพเดทล่าสุด: 24 พฤษภาคม 2026

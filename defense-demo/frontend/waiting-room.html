@@ -1,0 +1,130 @@
+﻿<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ThaiTicket Major — Waiting Room</title>
+  <link rel="stylesheet" href="/static/ttm.css" />
+  <script src="/static/event-config.js"></script>
+  <script src="/static/akamai-sensor.js"></script>
+  <script src="/static/telemetry.js"></script>
+  <script src="/static/ttm-ui.js"></script>
+</head>
+<body>
+  <header class="ttm-header">
+    <div class="ttm-logo">
+      <div class="ttm-logo-main">
+        <span class="ttm-logo-badge">TTM</span>
+        <span>THAITICKET MAJOR</span>
+      </div>
+      <span class="ttm-logo-sub">a ticketmaster company</span>
+    </div>
+  </header>
+
+  <main class="ttm-main">
+    <span id="demo-badge" class="demo-badge hidden">Demo Mode — ?demo=1</span>
+
+    <section id="phase-too-early" class="hidden">
+      <h1 class="ttm-event-title event-title"></h1>
+      <div class="early-banner" id="early-message"></div>
+      <p class="ttm-copy">ระบบจะเปิดให้เข้าห้องรอก่อนเวลาขายจริง 30 นาที</p>
+    </section>
+
+    <section id="phase-login" class="hidden">
+      <h1 class="ttm-event-title event-title"></h1>
+      <p class="ttm-copy" id="pre-login-note"></p>
+      <div class="login-card">
+        <h2>เข้าสู่ระบบสมาชิก</h2>
+        <p>ล็อกอินก่อนเวลาเปิดขายเพื่อเข้าห้องรอ (Defense Layer 1 ตรวจ IP ที่ Gateway)</p>
+        <form id="login-form">
+          <div class="form-group">
+            <label for="login-email">อีเมล</label>
+            <input id="login-email" type="email" placeholder="member@example.com" required autocomplete="username" />
+          </div>
+          <div class="form-group">
+            <label for="login-password">รหัสผ่าน</label>
+            <input id="login-password" type="password" placeholder="••••••••" required autocomplete="current-password" />
+          </div>
+          <button type="submit" class="ttm-btn">เข้าสู่ระบบ</button>
+        </form>
+        <p class="login-note">Demo: ใส่อีเมล/รหัสผ่านอะไรก็ได้</p>
+      </div>
+    </section>
+
+    <section id="phase-countdown" class="hidden">
+      <h1 class="ttm-event-title event-title"></h1>
+      <p class="ttm-copy">
+        ยังไม่ถึงเวลาเปิดขาย กรุณารอในหน้านี้ — อย่าปิดหรือรีเฟรชหน้าจอ
+      </p>
+      <p class="ttm-start-time">The event will begin at: <strong id="sale-start-label"></strong></p>
+      <div id="countdown-display" class="countdown-display">-- Minutes -- Seconds</div>
+      <div class="status-line">
+        <span class="status-dot"></span>
+        Status last updated: <span class="status-updated"></span>
+      </div>
+    </section>
+
+    <section id="phase-queue" class="hidden">
+      <h1 class="queue-heading">You are in the buying queue.</h1>
+      <p class="queue-subheading">
+        You are in the buying queue <strong class="event-title"></strong>.
+        Once your buying queue is reached, you will have 10 minutes to complete your purchase.
+      </p>
+      <p id="queue-position" class="ttm-copy"></p>
+      <p id="bot-score-label" class="ttm-copy hidden"></p>
+      <div class="progress-wrap">
+        <div id="progress-user" class="progress-user" style="left: 0%">
+          <div class="progress-user-icon" aria-hidden="true">🚶</div>
+          <div class="progress-user-tail"></div>
+        </div>
+        <div class="progress-track">
+          <div id="progress-fill" class="progress-fill"></div>
+        </div>
+      </div>
+      <div class="status-line">
+        <span class="status-dot live"></span>
+        Status last updated: <span class="status-updated"></span>
+      </div>
+    </section>
+
+    <section id="phase-admitted" class="hidden">
+      <h1 class="queue-heading">ผ่านคิวแล้ว!</h1>
+      <p class="queue-subheading">
+        Queue Service ออก token แล้ว — คุณมีเวลา 10 นาทีในการเลือกที่นั่งและชำระเงิน
+      </p>
+      <p class="event-title ttm-event-title" style="font-size:1rem;"></p>
+      <button id="btn-enter-seats" class="ttm-btn">เลือกที่นั่ง</button>
+    </section>
+
+    <div id="defense-error" class="alert-banner error hidden"></div>
+  </main>
+
+  <div id="entry-overlay" class="entry-overlay hidden">
+    <div class="entry-modal">
+      <h2>YOU ARE NOW IN THE ENTRY ZONE</h2>
+      <p>The waiting room is now open. Please click to join.</p>
+      <button id="btn-join-queue" class="ttm-btn">Join the Queue</button>
+    </div>
+  </div>
+
+  <div id="akamai-challenge-modal" class="modal-backdrop hidden">
+    <div class="activity-modal">
+      <h2>Akamai Bot Manager — Challenge</h2>
+      <p>Bot Score สูง — ต้องยืนยันความเป็นมนุษย์ก่อนเข้าคิว priority</p>
+      <p class="ttm-copy">สถานะคุกกี้ <code>_abck</code>: challenged (-1)</p>
+      <button id="btn-akamai-challenge" class="ttm-btn">Complete Challenge</button>
+    </div>
+  </div>
+
+  <div id="activity-modal" class="modal-backdrop hidden">
+    <div class="activity-modal">
+      <h2>Still here?</h2>
+      <p>Please confirm you’re still waiting. This won’t affect your place in line.</p>
+      <button id="btn-activity-confirm" class="ttm-btn">Yes, I'm here</button>
+    </div>
+  </div>
+
+  <footer class="ttm-footer"></footer>
+  <script src="/static/waiting-room.js"></script>
+</body>
+</html>
