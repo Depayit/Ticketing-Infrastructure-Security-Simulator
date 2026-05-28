@@ -39,12 +39,12 @@
                               "GA",
                               "Standing"
                           ],
-    "graphql_url":  "http://defense-gateway:8090/graphql/v2",
-    "defense_demo_event_id":  "demo-concert-2026",
-    "akamai_provider":  "playwright",
-    "akamai_target_url":  "",
-    "akamai_headless":  true,
-    "akamai_wait_ms":  6000,
-    "akamai_api_url":  "",
-    "akamai_api_key":  "YOUR_HYPER_SOLUTIONS_KEY_HERE"
+    "bot_mode":  "queueit",
+    "target_url":  "https://www.thaiticketmajor.com/concert/your-event-here",
+    "queueit":  {
+                    "headless":  true,
+                    "hold_seconds":  600,
+                    "max_minutes":  120,
+                    "stop_on_first":  true
+                }
 }

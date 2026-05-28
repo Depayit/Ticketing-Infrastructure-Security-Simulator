@@ -9,6 +9,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN playwright install chromium && playwright install-deps chromium
 
 COPY bot.py .
+COPY stealth.py .
 COPY config.json .
 
 CMD ["python", "bot.py"]

@@ -9,20 +9,13 @@ import hashlib
 import redis
 import telegram
 from datetime import datetime
-from gql import gql
 from typing import Dict, List, Optional
 from urllib.parse import urlparse
 from playwright.async_api import async_playwright
 
-# Akamai BMP + TLS-spoofing transport
-from akamai import (
-    AkamaiCookieJar,
-    AkamaiSession,
-    AKAMAI_TTL,
-    build_provider,
-    detect_akamai_block,
-)
-from tls_transport import TLSGraphQLClient, impersonate_target_for
+# Browser-side stealth toolkit (fingerprint + behaviour + JS injection).
+# This bot is browser-only — there is no GraphQL/HTTP purchase path.
+import stealth
 
 # ── Config loading ─────────────────────────────────────────────────────────────
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
@@ -67,101 +60,7 @@ def get_tg_bot() -> Optional[telegram.Bot]:
         _tg_token = token
     return _tg_bot
 
-DEFAULT_GRAPHQL_URL = "https://api.thaiticketmajor.com/graphql/v2"
-
-
-def get_graphql_url() -> str:
-    return os.environ.get("GRAPHQL_URL") or config.get("graphql_url") or DEFAULT_GRAPHQL_URL
-
-
-def build_graphql_client(
-    headers: dict,
-    proxy: Optional[str],
-    *,
-    cookies: Optional[Dict[str, str]] = None,
-    impersonate: str = "chrome131",
-    timeout: float = 30.0,
-) -> TLSGraphQLClient:
-    """Construct a TLS-spoofing GraphQL client targeting the current
-    `graphql_url`, with Akamai cookies pre-injected when supplied."""
-    return TLSGraphQLClient(
-        get_graphql_url(),
-        headers=headers,
-        cookies=cookies,
-        proxy=proxy,
-        impersonate=impersonate,
-        timeout=timeout,
-    )
-
-
-
-
-# ── Queue-it Token Pool ────────────────────────────────────────────────────────
-# Each proxy gets its own cached token. Workers fetch tokens in the background
-# so that when the purchase loop fires, tokens are already warm and ready.
-
-QUEUE_TOKEN_TTL = 840  # seconds (14 min — conservative vs Queue-it 15 min)
 QUEUE_CAPTCHA_URL_TPL = "https://www.thaiticketmajor.com/concert/{event_id}"
-
-class QueueTokenPool:
-    """Redis-backed per-proxy Queue-it token cache."""
-
-    @staticmethod
-    def _key(proxy: Optional[str]) -> str:
-        proxy_val = proxy or "direct_connection"
-        h = hashlib.md5(proxy_val.encode()).hexdigest()[:10]
-        return f"ttm:qt:{h}"
-
-    @classmethod
-    def store(cls, proxy: str, queue_token: str, captcha_token: str) -> None:
-        payload = json.dumps({
-            "queue_token": queue_token,
-            "captcha_token": captcha_token,
-            "expires_at": time.time() + QUEUE_TOKEN_TTL,
-        })
-        r.setex(cls._key(proxy), QUEUE_TOKEN_TTL, payload)
-
-    @classmethod
-    def get(cls, proxy: str) -> Optional[Dict]:
-        raw = r.get(cls._key(proxy))
-        if not raw:
-            return None
-        data = json.loads(raw)
-        if data["expires_at"] < time.time():
-            r.delete(cls._key(proxy))
-            return None
-        return data
-
-    @classmethod
-    def invalidate(cls, proxy: str) -> None:
-        r.delete(cls._key(proxy))
-
-    @classmethod
-    def warmup_count(cls, proxies: List[str]) -> int:
-        """How many proxies already have a live token."""
-        return sum(1 for p in proxies if cls.get(p) is not None)
-
-
-# ── Shared GraphQL queries (compiled once) ────────────────────────────────────
-QUEUE_STATUS_QUERY = gql("""
-    query QueueStatus($eventId: String!) {
-        queueStatus(eventId: $eventId) { status token captchaSitekey }
-    }
-""")
-
-ADD_TO_CART_MUTATION = gql("""
-    mutation AddToCart($input: AddToCartInput!) {
-        addToCart(input: $input) { success cartId }
-    }
-""")
-
-CHECKOUT_MUTATION = gql("""
-    mutation Checkout($input: CheckoutInput!) {
-        checkout(input: $input) {
-            success orderId paymentUrl status
-        }
-    }
-""")
 
 
 # ── TTMWorker ─────────────────────────────────────────────────────────────────
@@ -173,10 +72,6 @@ class TTMWorker:
         self.worker_key = f"worker:{self.instance_id}"
         self.success = False
         self.current_profile_idx = 0
-        # Akamai state — provider + cookie jar; rebuilt when config changes
-        self._akamai_jar = AkamaiCookieJar(r)
-        self._akamai_provider = None  # built lazily in _refresh_config
-        self._akamai_provider_name = ""
         self._refresh_config()
 
     # ── config ─────────────────────────────────────────────────────────────────
@@ -184,7 +79,12 @@ class TTMWorker:
     def _refresh_config(self):
         global config
         config = load_config(r)
-        self.bot_mode: str = config.get("bot_mode", "ttm")
+        # Browser-only bot. "queueit" = real TTM/Queue-it funnel (default),
+        # "general" = generic button-click automation. (legacy "ttm" GraphQL
+        # mode has been removed.)
+        self.bot_mode: str = config.get("bot_mode", "queueit")
+        if self.bot_mode == "ttm":
+            self.bot_mode = "queueit"
         self.target_url: str = config.get("target_url", "")
         self.click_selector: str = config.get("click_selector", "button:has-text('Add to Cart'), button:has-text('ซื้อเลย'), button:has-text('ใส่ตะกร้า')")
         self.refresh_mode: str = config.get("refresh_mode", "auto_refresh")
@@ -200,33 +100,45 @@ class TTMWorker:
         self.proxy_rotator_url: str = os.environ.get("PROXY_ROTATOR_URL") or config.get("proxy_rotator_url", "http://proxy-rotator:8080")
         self.proxies_per_worker: int = int(config.get("proxies_per_worker", 5))
 
-        # Rebuild Akamai provider only when the configured name changes —
-        # PlaywrightProvider creates Chromium contexts on demand so the
-        # object itself is cheap to keep around.
-        provider_name = str(config.get("akamai_provider") or "noop").lower()
-        if provider_name != self._akamai_provider_name or self._akamai_provider is None:
-            self._akamai_provider = build_provider(config)
-            self._akamai_provider_name = provider_name
-
-    def _akamai_target_url(self) -> str:
-        """URL the sensor provider should solve against. Prefers an explicit
-        `akamai_target_url`, then `target_url`, then derives one from the
-        event id for the TTM concert flow."""
-        explicit = config.get("akamai_target_url") or ""
-        if explicit:
-            return explicit
-        if self.target_url:
-            return self.target_url
-        if self.event_id:
-            return f"https://www.thaiticketmajor.com/concert/{self.event_id}"
-        return "https://www.thaiticketmajor.com/"
-
-    def _akamai_session(self) -> AkamaiSession:
-        return AkamaiSession(
-            self._akamai_provider,
-            self._akamai_jar,
-            self._akamai_target_url(),
+        # ── Queue-it browser flow (bot_mode == "queueit") ─────────────────────
+        qi = config.get("queueit", {}) or {}
+        self.qi_headless: bool = bool(qi.get("headless", True))
+        # Selector groups — each is a comma-separated CSS list; we also fall
+        # back to text matching for the standard Queue-it widget labels.
+        self.qi_book_selector: str = qi.get(
+            "book_selector",
+            "a:has-text('จอง'), a:has-text('ซื้อบัตร'), button:has-text('จอง'), "
+            "button:has-text('ซื้อบัตร'), a:has-text('Buy'), button:has-text('Buy Now')",
         )
+        self.qi_join_texts: List[str] = qi.get(
+            "join_texts",
+            ["Join the Queue", "Join Queue", "เข้าสู่คิว", "เข้าคิว", "Join now"],
+        )
+        self.qi_stillhere_texts: List[str] = qi.get(
+            "stillhere_texts",
+            ["Yes", "Yes, I'm here", "I'm here", "ใช่", "ยังอยู่", "Continue"],
+        )
+        self.qi_seat_selector: str = qi.get(
+            "seat_selector",
+            ".seat:not(.sold):not(.unavailable), .zone-available, [data-seat-available='true'], "
+            "li.available, .seatAvailable",
+        )
+        self.qi_addtocart_selector: str = qi.get(
+            "addtocart_selector",
+            "button:has-text('ใส่ตะกร้า'), button:has-text('Add to Cart'), "
+            "button:has-text('สั่งซื้อ'), button:has-text('ดำเนินการต่อ'), "
+            "button:has-text('Confirm'), button:has-text('ยืนยัน')",
+        )
+        # Markers that mean "still inside the Queue-it waiting flow".
+        self.qi_queue_markers: List[str] = qi.get(
+            "queue_markers", ["queue-it.net", "queue-it", "/waiting", "entry zone", "buying queue"],
+        )
+        # Keep the seat-holding session alive (sec) for manual payment.
+        self.qi_hold_seconds: int = int(qi.get("hold_seconds", 600))
+        self.qi_max_minutes: int = int(qi.get("max_minutes", 120))
+        # Multi-instance: stop ALL workers on the first successful hold, or
+        # let each worker hold its own seat independently (more tickets).
+        self.qi_stop_on_first: bool = bool(qi.get("stop_on_first", True))
 
     async def _update_leased_proxies(self):
         """
@@ -677,386 +589,292 @@ class TTMWorker:
                 await self.send_log(f"CAPTCHA error: {e}", "ERROR")
         return None
 
-    # ── Queue-it token fetch ───────────────────────────────────────────────────
+    # ── Queue-it aware browser flow ─────────────────────────────────────────────
 
-    async def _fetch_queue_token(self, proxy: str) -> Optional[Dict]:
-        """
-        Fetch a fresh Queue-it token for *proxy* using the TLS-spoofing
-        transport and any cached Akamai cookies. Persists the result in
-        QueueTokenPool.
-        """
-        bp = self._get_browser_profile(proxy or "default_seed")
-        impersonate = impersonate_target_for(bp)
-        # Hot-path: cache-only read; the warmup loop is responsible for
-        # populating Akamai cookies via the configured sensor provider.
-        akamai_cookies = self._akamai_session().peek(proxy)
-
-        headers = {
-            "User-Agent": bp.get("user_agent") or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "application/json, */*",
-            "Accept-Language": bp.get("language", "th-TH,th;q=0.9,en;q=0.8"),
-            "Origin": "https://www.thaiticketmajor.com",
-            "Referer": f"https://www.thaiticketmajor.com/concert/{self.event_id}",
-            "x-ttm-version": "2026.5.2",
-            "x-correlation-id": str(uuid.uuid4()),
-            "apollographql-client-name": "ttm-web-2026",
-            "sec-fetch-dest": "empty",
-            "sec-fetch-mode": "cors",
-            "sec-fetch-site": "same-site",
-        }
-        if bp.get("browser") in ("chrome", "edge") and bp.get("sec_ch_ua"):
-            headers["Sec-CH-UA"] = bp["sec_ch_ua"]
-            headers["Sec-CH-UA-Mobile"] = "?0"
-            headers["Sec-CH-UA-Platform"] = f'"{bp.get("sec_ch_ua_platform", "Windows")}"'
-
-        client = build_graphql_client(
-            headers, proxy, cookies=akamai_cookies, impersonate=impersonate
-        )
+    def _qi_frames(self, page):
+        """All frames to search — Queue-it widgets often live in an iframe
+        (or on queue-it.net), so we scan the main page and every child frame."""
         try:
-            async with client as session:
-                qres = await session.execute(
-                    QUEUE_STATUS_QUERY, variable_values={"eventId": self.event_id}
-                )
-                if detect_akamai_block(
-                    session.last_status,
-                    session.last_response_text,
-                    session.last_response_cookies,
+            return [page] + [f for f in page.frames]
+        except Exception:
+            return [page]
+
+    async def _qi_click_text(self, page, behavior, texts: List[str]) -> bool:
+        """Click the first visible button/link/role=button matching any text,
+        searching the main page AND all iframes, with a human-like click."""
+        for frame in self._qi_frames(page):
+            for txt in texts:
+                for sel in (
+                    f"button:has-text('{txt}')",
+                    f"a:has-text('{txt}')",
+                    f"[role=button]:has-text('{txt}')",
+                    f"input[value='{txt}']",
                 ):
-                    self._akamai_session().invalidate(proxy)
-                    proxy_log = (proxy[-12:] if proxy else "direct")
-                    await self.send_log(
-                        f"🛡 Akamai blocked queue token fetch ({proxy_log}) — cookies invalidated",
-                        "WARN",
-                    )
-                    return None
-
-                qdata = qres.get("queueStatus", {})
-
-                # No queue active — token not needed
-                if qdata.get("status") in ("open", None, ""):
-                    QueueTokenPool.store(proxy, "", "")
-                    return {"queue_token": "", "captcha_token": ""}
-
-                queue_token = qdata.get("token", "")
-                captcha_token = ""
-
-                if qdata.get("captchaSitekey"):
-                    page_url = QUEUE_CAPTCHA_URL_TPL.format(event_id=self.event_id)
-                    captcha_token = await self.solve_captcha(
-                        qdata["captchaSitekey"], page_url
-                    ) or ""
-
-                QueueTokenPool.store(proxy, queue_token, captcha_token)
-                return {"queue_token": queue_token, "captcha_token": captcha_token}
-
-        except Exception as e:
-            proxy_log = (proxy[-12:] if proxy else "direct")
-            await self.send_log(f"Queue token fetch failed ({proxy_log}): {e}", "WARN")
-            return None
-
-    async def _get_or_fetch_queue_token(self, proxy: str) -> Dict:
-        """Return cached token or fetch a fresh one. Guaranteed to return a dict."""
-        cached = QueueTokenPool.get(proxy)
-        if cached:
-            return cached
-        result = await self._fetch_queue_token(proxy)
-        return result or {"queue_token": "", "captcha_token": ""}
-
-    # ── Token warmup background task ──────────────────────────────────────────
-
-    async def _token_warmup_loop(self):
-        """
-        Background coroutine that continuously pre-fetches Queue-it tokens
-        for all configured proxies so purchases don't have to wait.
-        Runs until the worker is done.
-        """
-        while not self.success:
-            if not await self.is_running():
-                await asyncio.sleep(2)
-                continue
-
-            self._refresh_config()
-            proxies = self.proxies
-            if not proxies or not self.event_id:
-                await asyncio.sleep(5)
-                continue
-
-            # Fetch only for proxies that don't have a live token yet
-            stale = [p for p in proxies if QueueTokenPool.get(p) is None]
-            if stale:
-                warm = len(proxies) - len(stale)
-                await self.send_log(
-                    f"🔑 Token warmup: {warm}/{len(proxies)} warm, fetching {len(stale)}…",
-                    "DEBUG",
-                )
-                tasks = [self._fetch_queue_token(p) for p in stale]
-                await asyncio.gather(*tasks, return_exceptions=True)
-
-            # Sleep until tokens are ~80% through their TTL
-            await asyncio.sleep(QUEUE_TOKEN_TTL * 0.7)
-
-    # ── Akamai cookie warmup ───────────────────────────────────────────────────
-
-    async def _akamai_warmup_loop(self):
-        """Pre-fetch validated Akamai cookies for each proxy so purchase
-        waves don't have to block on the (slow) sensor solve. Concurrency
-        is intentionally capped — PlaywrightProvider spawns real Chromium
-        instances and we don't want to thrash the host."""
-        provider_name = self._akamai_provider_name
-        if provider_name == "noop":
-            await self.send_log(
-                "🛡 Akamai provider = noop — skipping warmup loop "
-                "(set akamai_provider=playwright|hyper to enable)",
-                "DEBUG",
-            )
-            return
-
-        sem_size = 2 if provider_name in ("playwright", "local", "browser") else 6
-        sem = asyncio.Semaphore(sem_size)
-
-        async def _solve_one(proxy: Optional[str]) -> None:
-            bp = self._get_browser_profile(proxy or "default_seed")
-            async with sem:
-                sess = self._akamai_session()
-                await sess.prepare(proxy, bp, force_refresh=True)
-
-        while not self.success:
-            if not await self.is_running():
-                await asyncio.sleep(2)
-                continue
-
-            self._refresh_config()
-            proxies = self.proxies
-            if not proxies:
-                await asyncio.sleep(5)
-                continue
-
-            stale = [p for p in proxies if self._akamai_jar.get(p) is None]
-            if stale:
-                warm = len(proxies) - len(stale)
-                await self.send_log(
-                    f"🛡 Akamai warmup ({self._akamai_provider_name}): "
-                    f"{warm}/{len(proxies)} warm, solving {len(stale)}…",
-                    "DEBUG",
-                )
-                await asyncio.gather(
-                    *(_solve_one(p) for p in stale), return_exceptions=True
-                )
-
-            await asyncio.sleep(AKAMAI_TTL * 0.7)
-
-    # ── Single purchase attempt ────────────────────────────────────────────────
-
-    async def _attempt(
-        self,
-        proxy: str,
-        ticket_type: str,
-        profile: Dict,
-        quantity: int = 2,
-    ) -> bool:
-        """
-        One full purchase attempt using a browser-fingerprinted session.
-        Uses QueueTokenPool so queue tokens are reused across attempts.
-        """
-        if await self.global_stopped():
-            return False
-
-        card = profile["card"]
-        qt = await self._get_or_fetch_queue_token(proxy)
-        bp = self._get_browser_profile(proxy)
-
-        # Build full Antidetect-style headers from the browser profile
-        browser = bp.get("browser", "chrome")
-        headers: Dict[str, str] = {
-            "User-Agent": bp.get("user_agent", ""),
-            "Accept": "application/json, */*",
-            "Accept-Language": bp.get("language", "th-TH"),
-            "Accept-Encoding": "gzip, deflate, br, zstd",
-            "Origin": "https://www.thaiticketmajor.com",
-            "Referer": f"https://www.thaiticketmajor.com/concert/{self.event_id}",
-            "x-ttm-version": "2026.5.2",
-            "x-correlation-id": str(uuid.uuid4()),
-            "apollographql-client-name": "ttm-web-2026",
-            "sec-fetch-dest": "empty",
-            "sec-fetch-mode": "cors",
-            "sec-fetch-site": "same-site",
-        }
-
-        # Chromium-based browsers send Sec-CH-UA headers
-        if browser in ("chrome", "edge"):
-            sec_ch_ua = bp.get("sec_ch_ua", "")
-            sec_ch_ua_platform = bp.get("sec_ch_ua_platform", "Windows")
-            if sec_ch_ua:
-                headers["Sec-CH-UA"] = sec_ch_ua
-                headers["Sec-CH-UA-Mobile"] = "?0"
-                headers["Sec-CH-UA-Platform"] = f'"{sec_ch_ua_platform}"'
-
-        if bp.get("do_not_track"):
-            headers["DNT"] = "1"
-
-        if qt.get("queue_token"):
-            headers["x-queueit-token"] = qt["queue_token"]
-        if qt.get("captcha_token"):
-            headers["x-captcha-token"] = qt["captcha_token"]
-
-        # Akamai cookies — hot-path read only, no inline solving. The
-        # warmup loop owns provider.acquire(); here we just consume cache.
-        akamai_session = self._akamai_session()
-        akamai_cookies = akamai_session.peek(proxy)
-        impersonate = impersonate_target_for(bp)
-
-        client = build_graphql_client(
-            headers, proxy, cookies=akamai_cookies, impersonate=impersonate
-        )
-
-        try:
-            async with client as session:
-                # ── Add to Cart ───────────────────────────────────────────────
-                cart_result = await session.execute(
-                    ADD_TO_CART_MUTATION,
-                    variable_values={
-                        "input": {
-                            "eventId": self.event_id,
-                            "ticketType": ticket_type,
-                            "quantity": quantity,
-                            "priceTier": "standard",
-                        }
-                    },
-                )
-
-                # Drop cookies if Akamai downgraded _abck mid-flight
-                if detect_akamai_block(
-                    session.last_status,
-                    session.last_response_text,
-                    session.last_response_cookies,
-                ):
-                    akamai_session.invalidate(proxy)
-                    proxy_log = (proxy[-12:] if proxy else "direct")
-                    await self.send_log(
-                        f"🛡 Akamai blocked addToCart ({ticket_type}|{proxy_log}) — cookies invalidated",
-                        "WARN",
-                    )
-                    return False
-
-                cart_data = cart_result.get("addToCart", {})
-
-                # Token rejected by server → invalidate and retry next round
-                if cart_data.get("errorCode") in ("QUEUE_TOKEN_INVALID", "QUEUE_REQUIRED"):
-                    await self.send_log(
-                        f"⚠ Queue token rejected ({proxy[-12:]}) — invalidating", "WARN"
-                    )
-                    QueueTokenPool.invalidate(proxy)
-                    return False
-
-                cart_id = cart_data.get("cartId")
-                if not cart_id:
-                    return False
-
-                # ── Checkout ──────────────────────────────────────────────────
-                final = await session.execute(
-                    CHECKOUT_MUTATION,
-                    variable_values={
-                        "input": {
-                            "cartId": cart_id,
-                            "buyer": {
-                                "fullName": profile["fullname"],
-                                "email": profile["email"],
-                                "phone": profile["phone"],
-                                "nationalId": profile.get("id_card"),
-                            },
-                            "paymentMethod": "credit_card",
-                            "card": {
-                                "number": card["number"],
-                                "expMonth": card["exp"][:2],
-                                "expYear": "20" + card["exp"][2:],
-                                "cvv": card["cvv"],
-                                "name": profile["fullname"],
-                            },
-                            "queueToken": qt.get("queue_token"),
-                        }
-                    },
-                )
-
-                if detect_akamai_block(
-                    session.last_status,
-                    session.last_response_text,
-                    session.last_response_cookies,
-                ):
-                    akamai_session.invalidate(proxy)
-                    proxy_log = (proxy[-12:] if proxy else "direct")
-                    await self.send_log(
-                        f"🛡 Akamai blocked checkout ({ticket_type}|{proxy_log}) — cookies invalidated",
-                        "WARN",
-                    )
-                    return False
-
-                result = final.get("checkout", {})
-                if result.get("success") or result.get("status") in ["success", "redirect"]:
-                    self.success = True
-                    await self.send_log(
-                        f"🎉 สำเร็จ! Order: {result.get('orderId')} | "
-                        f"{ticket_type} | {profile['email']}",
-                        "SUCCESS",
-                    )
-                    await self.set_global_stop()
-                    return True
-
-                return False
-
-        except Exception as e:
-            err = str(e)
-            if "queue" in err.lower() or "token" in err.lower():
-                QueueTokenPool.invalidate(proxy)
-            if "akamai" in err.lower() or "_abck" in err.lower() or "403" in err:
-                akamai_session.invalidate(proxy)
-            proxy_log = (proxy[-12:] if proxy else "direct")
-            await self.send_log(
-                f"Attempt error ({ticket_type}|{proxy_log}): {err}", "ERROR"
-            )
-            return False
-
-    # ── Concurrent purchase wave ───────────────────────────────────────────────
-
-    async def _purchase_wave_custom(self, proxies_list: List[str]) -> bool:
-        if not self.profiles:
-            await self.send_log("ไม่มี profiles — ตั้งค่าผ่าน Dashboard ก่อน", "ERROR")
-            return False
-
-        tickets = self.ticket_priorities
-
-        for ticket_type in tickets:
-            if await self.global_stopped() or not await self.is_running():
-                return False
-
-            tasks = []
-            for proxy in proxies_list:
-                actual_proxy = None if proxy == "direct" else proxy
-                # Select a profile
-                p_idx = 0
-                if actual_proxy:
-                    p_idx = int(hashlib.md5(actual_proxy.encode()).hexdigest(), 16) % len(self.profiles)
-                else:
-                    # Deterministically distribute direct profiles by worker index if any
-                    p_idx = self.current_profile_idx % len(self.profiles)
-                
-                profile = self.profiles[p_idx]
-                tasks.append(self._attempt(actual_proxy, ticket_type, profile))
-
-            if not tasks:
-                continue
-
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            for res in results:
-                if res is True:
-                    return True
-
-            await asyncio.sleep(random.uniform(0.15, 0.45))
-
+                    try:
+                        loc = frame.locator(sel).first
+                        if await loc.count() == 0 or not await loc.is_visible():
+                            continue
+                        box = await loc.bounding_box()
+                        if box and frame == page:
+                            await behavior.click(
+                                page, box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+                            )
+                        else:
+                            await loc.click(timeout=3000)
+                        return True
+                    except Exception:
+                        continue
         return False
 
-    async def _purchase_wave(self) -> bool:
-        return await self._purchase_wave_custom(self.proxies)
+    async def _qi_try_selector(self, page, behavior, selector: str) -> bool:
+        """Human-click the first match of a CSS selector list (main + frames)."""
+        for frame in self._qi_frames(page):
+            try:
+                loc = frame.locator(selector).first
+                if await loc.count() == 0 or not await loc.is_visible():
+                    continue
+                box = await loc.bounding_box()
+                if box and frame == page:
+                    await behavior.click(
+                        page, box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+                    )
+                else:
+                    await loc.click(timeout=3000)
+                return True
+            except Exception:
+                continue
+        return False
+
+    async def _qi_in_queue(self, page) -> bool:
+        """True while the page still looks like a Queue-it waiting screen."""
+        try:
+            url = (page.url or "").lower()
+            if any(m.lower() in url for m in self.qi_queue_markers if "/" in m or "." in m):
+                return True
+            for frame in self._qi_frames(page):
+                try:
+                    body = (await frame.inner_text("body"))[:4000].lower()
+                except Exception:
+                    continue
+                for m in ("entry zone", "buying queue", "waiting room", "you are now in",
+                          "please wait", "your turn", "ห้องรอ", "กำลังรอ"):
+                    if m in body:
+                        return True
+        except Exception:
+            pass
+        return False
+
+    async def _qi_on_purchase_page(self, page) -> bool:
+        """Heuristic: released from the queue onto a seat/cart page."""
+        try:
+            for frame in self._qi_frames(page):
+                try:
+                    if await frame.locator(self.qi_seat_selector).count() > 0:
+                        return True
+                    if await frame.locator(self.qi_addtocart_selector).count() > 0:
+                        return True
+                    body = (await frame.inner_text("body"))[:4000].lower()
+                except Exception:
+                    continue
+                if any(k in body for k in ("เลือกที่นั่ง", "เลือกโซน", "select seat", "ใส่ตะกร้า", "add to cart")):
+                    return True
+        except Exception:
+            pass
+        return False
+
+    async def _qi_notify_payment_ready(self, page, proxy: Optional[str]) -> None:
+        """Hold-only deliverable: capture proof + handoff data so a human can
+        finish payment (OTP/3DS) on the already-warmed session."""
+        url = ""
+        shot_path = ""
+        cookie_str = ""
+        try:
+            url = page.url
+        except Exception:
+            pass
+        try:
+            shot_path = f"/app/payment_ready_{self.instance_id}.png"
+            await page.screenshot(path=shot_path, full_page=True)
+        except Exception:
+            shot_path = ""
+        try:
+            ctx_cookies = await page.context.cookies()
+            cookie_str = "; ".join(f"{c['name']}={c['value']}" for c in ctx_cookies)
+        except Exception:
+            pass
+
+        handoff = {
+            "worker": self.instance_id,
+            "proxy": (proxy[-16:] if proxy else "direct"),
+            "checkout_url": url,
+            "cookies": cookie_str,
+            "ts": datetime.now().isoformat(),
+        }
+        try:
+            r.lpush("ttm:payment_ready", json.dumps(handoff))
+            r.ltrim("ttm:payment_ready", 0, 50)
+        except Exception:
+            pass
+
+        await self.send_log(
+            f"🎟️ HOLD สำเร็จ! ล็อกที่นั่งได้แล้ว — เปิดลิงก์นี้เพื่อจ่าย (เหลือเวลา ~{self.qi_hold_seconds // 60} นาที):\n{url}",
+            "SUCCESS",
+        )
+        try:
+            bot = get_tg_bot()
+            if bot and shot_path:
+                with open(shot_path, "rb") as fh:
+                    await bot.send_photo(
+                        chat_id=config.get("telegram_chat_id", ""),
+                        photo=fh,
+                        caption=f"🎟️ ล็อกที่นั่งสำเร็จ ({handoff['proxy']})\nจ่ายต่อที่: {url}",
+                    )
+        except Exception:
+            pass
+
+    async def run_queueit_mode(self):
+        """Full ThaiTicketMajor + Queue-it browser flow (hold-only).
+
+        State machine mirroring the real funnel:
+          event page → click book → wait pre-queue countdown →
+          Join the Queue → answer "Still here?" → wait progress bar →
+          released → pick seat → add to cart → HOLD + notify human to pay.
+
+        Multi-instance: each worker drives its own stealthed Chromium on its
+        own leased proxy, so it holds an independent queue position. A small
+        per-worker join jitter avoids identical timing across the fleet.
+        """
+        from playwright.async_api import async_playwright
+
+        await self.send_log("🎫 เริ่มโหมด Queue-it Browser Flow (Hold-only)...")
+        await self._update_leased_proxies()
+
+        while not self.target_url:
+            await self.send_log("❌ ตั้งค่า Target URL (หน้า event) ก่อนเริ่ม", "ERROR")
+            await asyncio.sleep(5)
+            self._refresh_config()
+
+        proxy_str = self.proxies[0] if self.proxies else None
+        proxy_cfg = self._parse_playwright_proxy(proxy_str) if proxy_str else None
+        seed = proxy_str or self.instance_id
+        bp = self._get_browser_profile(seed)
+        fp = stealth.build_fingerprint(bp, seed)
+        stealth_js = stealth.build_stealth_script(fp)
+        viewport = {"width": int(fp.get("viewport_width", 1920)), "height": int(fp.get("viewport_height", 1080))}
+
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=self.qi_headless,
+                proxy=proxy_cfg,
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage",
+                ],
+            )
+            context = await browser.new_context(
+                user_agent=fp.get("user_agent"),
+                viewport=viewport,
+                device_scale_factor=float(fp.get("device_pixel_ratio", 1.0)),
+                locale=(fp.get("language") or "th-TH").split(",")[0],
+                timezone_id=fp.get("timezone", "Asia/Bangkok"),
+            )
+            await context.add_init_script(stealth_js)
+            page = await context.new_page()
+            try:
+                cdp = await context.new_cdp_session(page)
+                await cdp.send("Page.addScriptToEvaluateOnNewDocument", {"source": stealth_js})
+            except Exception:
+                pass
+
+            behavior = stealth.HumanBehavior(seed, viewport)
+            deadline = time.time() + self.qi_max_minutes * 60
+            phase = "open"
+
+            try:
+                await page.goto(self.target_url, timeout=60000, wait_until="domcontentloaded")
+                await self.send_log(f"🔗 เปิดหน้า event: {self.target_url}")
+                await behavior.wander(page, moves=3)
+
+                while not self.success and time.time() < deadline:
+                    if await self.global_stopped() or not await self.is_running():
+                        await self.send_log("⏹ STOP — ออกจาก Queue-it flow")
+                        break
+
+                    # Highest priority: never get dropped by the inactivity modal.
+                    if await self._qi_click_text(page, behavior, self.qi_stillhere_texts):
+                        await self.send_log("🟢 ตอบ 'Still here? → Yes' อัตโนมัติ", "DEBUG")
+                        await behavior.think(0.2, 0.6)
+                        continue
+
+                    # Released onto the real purchase page?
+                    if await self._qi_on_purchase_page(page):
+                        if phase != "purchase":
+                            phase = "purchase"
+                            await self.send_log("🎯 ทะลุคิวแล้ว! เข้าหน้าซื้อบัตร — กำลังเลือกที่นั่ง", "SUCCESS")
+                        await self._qi_try_selector(page, behavior, self.qi_seat_selector)
+                        await behavior.think(0.3, 0.9)
+                        if await self._qi_try_selector(page, behavior, self.qi_addtocart_selector):
+                            await self.send_log("🛒 กดใส่ตะกร้า/ดำเนินการต่อแล้ว", "INFO")
+                            await behavior.think(1.0, 2.0)
+                            body = ""
+                            try:
+                                body = (await page.inner_text("body"))[:4000].lower()
+                            except Exception:
+                                pass
+                            url_l = (page.url or "").lower()
+                            if any(k in body for k in (
+                                "checkout", "ชำระเงิน", "บัตรเครดิต", "payment",
+                                "ยืนยันการสั่งซื้อ", "order summary", "สรุปคำสั่งซื้อ",
+                            )) or any(k in url_l for k in ("checkout", "cart", "payment", "order")):
+                                await self._qi_notify_payment_ready(page, proxy_str)
+                                self.success = True
+                                if self.qi_stop_on_first:
+                                    await self.set_global_stop()
+                                await self.send_log(
+                                    f"⌛ คงเซสชันไว้ {self.qi_hold_seconds}s เพื่อให้จ่ายเงินต่อ...", "INFO"
+                                )
+                                await asyncio.sleep(self.qi_hold_seconds)
+                                break
+                        continue
+
+                    # Still in the waiting funnel → try to join, else keep alive.
+                    if await self._qi_in_queue(page):
+                        if await self._qi_click_text(page, behavior, self.qi_join_texts):
+                            if phase != "queue":
+                                phase = "queue"
+                                await self.send_log("⏩ กด 'Join the Queue' แล้ว — กำลังรอคิว", "INFO")
+                        elif phase == "queue":
+                            await behavior.wander(page, moves=1)
+                        await asyncio.sleep(random.uniform(0.8, 1.8))
+                        continue
+
+                    # Pre-queue: event page or countdown — try the book button.
+                    if await self._qi_try_selector(page, behavior, self.qi_book_selector):
+                        await self.send_log("📨 กดปุ่มจอง/ซื้อบัตรแล้ว", "INFO")
+                        # Small per-worker jitter so the fleet doesn't join in lockstep.
+                        await asyncio.sleep(random.uniform(0.1, 1.0))
+                        await behavior.think(0.4, 1.0)
+                        continue
+
+                    # Countdown not finished / nothing actionable → gentle reload.
+                    await behavior.wander(page, moves=1)
+                    await asyncio.sleep(random.uniform(1.5, 3.0))
+                    try:
+                        await page.reload(timeout=30000, wait_until="domcontentloaded")
+                    except Exception:
+                        pass
+
+                if not self.success and time.time() >= deadline:
+                    await self.send_log("⌛ หมดเวลา (max_minutes) — ออกจาก Queue-it flow", "WARN")
+
+            except Exception as e:
+                await self.send_log(f"❌ Queue-it flow error: {e}", "ERROR")
+            finally:
+                try:
+                    await context.close()
+                    await browser.close()
+                except Exception:
+                    pass
 
     # ── Main run loop ──────────────────────────────────────────────────────────
 
@@ -1072,77 +890,12 @@ class TTMWorker:
 
             self._refresh_config()
 
-            # Route to general browser automation mode if selected
+            # Browser-only bot. "general" = generic button-click automation;
+            # anything else (incl. legacy "ttm") → real Queue-it funnel.
             if self.bot_mode == "general":
                 await self.run_general_mode()
-                return
-
-            # Dynamic initial lease before starting loops
-            await self._update_leased_proxies()
-            
-            await self.send_log(
-                f"▶ START — Worker เริ่มทำงาน | "
-                f"Proxies (Leased): {len(self.proxies)} | Profiles: {len(self.profiles)}"
-            )
-
-            # Launch token warmup, Akamai warmup, and proxy lease refresh tasks
-            warmup_task = asyncio.create_task(self._token_warmup_loop())
-            lease_task = asyncio.create_task(self._proxy_lease_loop())
-            akamai_task = asyncio.create_task(self._akamai_warmup_loop())
-
-            try:
-                # ── Main purchase loop ────────────────────────────────────────
-                while not self.success:
-                    self.heartbeat()
-                    self._refresh_config()
-
-                    # Return to standby if STOP pressed
-                    if await self.global_stopped() or not await self.is_running():
-                        await self.send_log("⏹ STOP — Worker กลับสู่ Standby mode")
-                        while not await self.is_running():
-                            self.heartbeat()
-                            await asyncio.sleep(2)
-                        self.success = False
-                        await self.send_log("▶ START อีกครั้ง — Worker กลับมาทำงาน")
-                        continue
-
-                    if not self.proxies:
-                        # If no proxies configured, perform direct local connection request
-                        # Add a fake single string 'direct' to bypass empty loops
-                        active_proxies_list = ["direct"]
-                    else:
-                        active_proxies_list = self.proxies
-
-                    warm = QueueTokenPool.warmup_count(self.proxies) if self.proxies else 0
-                    akamai_warm = (
-                        self._akamai_jar.warm_count(self.proxies)
-                        if self.proxies else 0
-                    )
-                    await self.send_log(
-                        f"🚀 ยิง wave | "
-                        f"proxies={len(self.proxies)} warm={warm} "
-                        f"akamai={akamai_warm}/{len(self.proxies)} "
-                        f"tickets={self.ticket_priorities}"
-                    )
-
-                    # We pass active_proxies_list to purchase wave
-                    if await self._purchase_wave_custom(active_proxies_list):
-                        return  # success — exit
-
-                    # Fast re-poll: no long sleep, just a brief jitter
-                    await asyncio.sleep(random.uniform(0.3, 0.8))
-
-            finally:
-                warmup_task.cancel()
-                lease_task.cancel()
-                akamai_task.cancel()
-                try:
-                    await asyncio.gather(
-                        warmup_task, lease_task, akamai_task,
-                        return_exceptions=True,
-                    )
-                except Exception:
-                    pass
+            else:
+                await self.run_queueit_mode()
 
         finally:
             self.unregister_worker()

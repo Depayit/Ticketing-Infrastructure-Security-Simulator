@@ -1,10 +1,4 @@
 httpx[http2]
-gql
-graphql-core
-curl_cffi>=0.7.0
-aiosqlite
 redis
 python-telegram-bot==21.4
-aiohttp
-aiohttp-socks
 playwright
