@@ -2,7 +2,7 @@
     "event_id":  "concert-blackpink-world-tour-2026",
     "telegram_token":  "YOUR_TELEGRAM_BOT_TOKEN_HERE",
     "telegram_chat_id":  "YOUR_CHAT_ID_HERE",
-    "gemini_api_key": "AIzaSyD_PnXjcRMGdAfgiunVu8oo_x49-X2T4yA",
+    "gemini_api_key": "YOUR_GEMINI_API_KEY_HERE",
     "redis_url":  "redis://redis:6379/0",
     "proxy_rotator_url":  "http://proxy-rotator:8080",
     "proxies_per_worker":  5,
