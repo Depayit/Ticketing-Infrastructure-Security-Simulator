@@ -1,4 +1,4 @@
-﻿import json
+import json
 import sys
 import time
 import uuid
@@ -25,11 +25,17 @@ class CheckoutRequest(BaseModel):
     session_id: str = ""
     card_number: str = ""
     buyer_email: str = ""
+    payment_method: str = "credit_card"
+    attendees: list[str] = []
 
 
 class ThreeDSVerifyRequest(BaseModel):
     challenge_id: str
     otp: str
+
+
+class QRVerifyRequest(BaseModel):
+    challenge_id: str
 
 
 def seat_state_key(event_id: str, seat_id: str) -> str:
@@ -70,6 +76,23 @@ async def checkout(req: CheckoutRequest):
     except Exception:
         score_data = {"risk_score": 0.0, "decision": "allow"}
 
+    if req.payment_method == "qr":
+        challenge_id = str(uuid.uuid4())
+        r.setex(f"defense:qr:{challenge_id}", 300, json.dumps({
+            "cart_id": req.cart_id,
+            "cart": cart,
+            "session_id": session_id,
+            "ip": req.ip,
+            "attendees": req.attendees,
+        }))
+        log_event("payment", "qr_generated", session_id, req.ip, {"challenge_id": challenge_id})
+        return {
+            "success": False,
+            "status": "qr_required",
+            "orderId": None,
+            "challengeId": challenge_id,
+        }
+
     card_hash = req.card_number[-4:] if req.card_number else "unknown"
     card_use_key = f"defense:card:{card_hash}"
     card_sessions = r.incr(card_use_key)
@@ -79,12 +102,32 @@ async def checkout(req: CheckoutRequest):
         _release_cart(cart)
         raise HTTPException(status_code=403, detail={"errorCode": "CARDING_DETECTED"})
 
+    toggles_raw = r.get("defense:config:toggles")
+    toggles = json.loads(toggles_raw) if toggles_raw else {"three_ds": True}
+
+    if not toggles.get("three_ds", True):
+        order_id = f"ORD-{uuid.uuid4().hex[:10].upper()}"
+        r.lpush("defense:orders", json.dumps({
+            "order_id": order_id,
+            "event_id": cart["event_id"],
+            "seat_id": cart["seat_id"],
+            "quantity": cart.get("quantity", 1),
+            "total_price": cart.get("total_price", 0),
+            "email": cart.get("buyer_email", ""),
+            "committed_at": time.time(),
+            "attendees": req.attendees,
+        }))
+        r.delete(f"defense:cart:{req.cart_id}")
+        log_event("3ds", "payment_committed_bypass", session_id, req.ip, {"order_id": order_id})
+        return {"success": True, "orderId": order_id, "status": "success"}
+
     challenge_id = str(uuid.uuid4())
     r.setex(f"defense:3ds:{challenge_id}", 300, json.dumps({
         "cart_id": req.cart_id,
         "cart": cart,
         "session_id": session_id,
         "ip": req.ip,
+        "attendees": req.attendees,
     }))
 
     log_event("3ds", "challenge_issued", session_id, req.ip, {"challenge_id": challenge_id})
@@ -117,19 +160,18 @@ def verify_3ds(req: ThreeDSVerifyRequest):
     order_id = f"ORD-{uuid.uuid4().hex[:10].upper()}"
     event_id = cart["event_id"]
     seat_id = cart["seat_id"]
+    quantity = cart.get("quantity", 1)
+    total_price = cart.get("total_price", 0)
 
-    r.set(seat_state_key(event_id, seat_id), json.dumps({
-        "status": "sold",
-        "session_id": session_id,
-        "cart_id": cart.get("cart_id", ""),
-        "order_id": order_id,
-    }))
     r.lpush("defense:orders", json.dumps({
         "order_id": order_id,
         "event_id": event_id,
         "seat_id": seat_id,
+        "quantity": quantity,
+        "total_price": total_price,
         "email": cart.get("buyer_email", ""),
         "committed_at": time.time(),
+        "attendees": payload.get("attendees", []),
     }))
     r.delete(f"defense:cart:{payload['cart_id']}")
     r.delete(f"defense:3ds:{req.challenge_id}")
@@ -138,12 +180,39 @@ def verify_3ds(req: ThreeDSVerifyRequest):
     return {"success": True, "orderId": order_id, "status": "success"}
 
 
+@app.post("/internal/qr/verify")
+def verify_qr(req: QRVerifyRequest):
+    raw = r.get(f"defense:qr:{req.challenge_id}")
+    if not raw:
+        raise HTTPException(status_code=404, detail={"errorCode": "CHALLENGE_EXPIRED"})
+
+    payload = json.loads(raw)
+    cart = payload["cart"]
+    session_id = payload.get("session_id", "")
+
+    order_id = f"ORD-{uuid.uuid4().hex[:10].upper()}"
+    event_id = cart["event_id"]
+    seat_id = cart["seat_id"]
+    quantity = cart.get("quantity", 1)
+    total_price = cart.get("total_price", 0)
+
+    r.lpush("defense:orders", json.dumps({
+        "order_id": order_id,
+        "event_id": event_id,
+        "seat_id": seat_id,
+        "quantity": quantity,
+        "total_price": total_price,
+        "email": cart.get("buyer_email", ""),
+        "committed_at": time.time(),
+        "payment_method": "qr",
+        "attendees": payload.get("attendees", []),
+    }))
+    r.delete(f"defense:cart:{payload['cart_id']}")
+    r.delete(f"defense:qr:{req.challenge_id}")
+
+    log_event("payment", "qr_payment_committed", session_id, payload.get("ip", ""), {"order_id": order_id})
+    return {"success": True, "orderId": order_id, "status": "success"}
+
+
 def _release_cart(cart: Dict[str, Any]) -> None:
-    event_id = cart.get("event_id")
-    seat_id = cart.get("seat_id")
-    if event_id and seat_id:
-        r.set(seat_state_key(event_id, seat_id), json.dumps({
-            "status": "available",
-            "session_id": "",
-            "cart_id": "",
-        }))
+    pass

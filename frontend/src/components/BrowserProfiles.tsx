@@ -294,8 +294,8 @@ function EditModal({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+      <div className="bg-zinc-900 border border-zinc-700 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl mx-auto">
         {/* Header */}
         <div
           className="px-6 py-4 border-b border-zinc-700 flex justify-between items-center"
@@ -332,7 +332,7 @@ function EditModal({
         <div className="px-6 py-5 space-y-4">
           {tab === 'identity' && (
             <>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs text-zinc-400 mb-1 font-medium">Browser</label>
                   <select
@@ -412,7 +412,7 @@ function EditModal({
 
           {tab === 'system' && (
             <>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {field('Viewport Width', 'viewport_width', 'number')}
                 {field('Viewport Height', 'viewport_height', 'number')}
                 {field('Screen Width', 'screen_width', 'number')}
@@ -432,7 +432,7 @@ function EditModal({
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-zinc-400 mb-1 font-medium">Hardware Concurrency (cores)</label>
                   <select

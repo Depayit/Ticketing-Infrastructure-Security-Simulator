@@ -197,11 +197,23 @@ class HumanBehavior:
 
     def __init__(self, seed: str, viewport: Mapping[str, int]):
         self.rng = _seed_rng((seed or "default") + ":behavior")
+        
+        # Personality Profile (deterministic per bot instance)
+        # Each bot gets a unique "personality" for typing speed, mouse speed, etc.
+        self.mouse_speed = self.rng.uniform(0.6, 1.5)       # Mouse movement speed multiplier
+        self.typing_speed = self.rng.uniform(0.5, 1.6)      # Typing speed multiplier
+        self.mouse_jitter = self.rng.uniform(0.3, 1.5)      # Mouse jitter (shakiness) intensity
+        self.mistake_multiplier = self.rng.uniform(0.5, 2.5) # How clumsy this bot is when typing
+        self.think_multiplier = self.rng.uniform(0.5, 2.0)  # How long this bot pauses to think
+        
+        # Dynamic runtime RNG to ensure the exact same bot doesn't repeat identical paths
+        self.dynamic_rng = random.Random(self.rng.random() + time.time())
+        
         self.vw = int(viewport.get("width", 1920))
         self.vh = int(viewport.get("height", 1080))
         self.events: List[Dict[str, Any]] = []
-        self._x = float(self.rng.randint(40, self.vw - 40))
-        self._y = float(self.rng.randint(40, self.vh - 40))
+        self._x = float(self.dynamic_rng.randint(40, self.vw - 40))
+        self._y = float(self.dynamic_rng.randint(40, self.vh - 40))
         self._t0 = time.time()
 
     def _ts(self) -> float:
@@ -218,31 +230,33 @@ class HumanBehavior:
         end = (x, y)
         dist = math.hypot(end[0] - start[0], end[1] - start[1])
         if steps is None:
-            steps = max(8, min(60, int(dist / 12) + self.rng.randint(4, 12)))
+            # Vary steps based on bot personality
+            base_steps = int(dist / 12) + self.dynamic_rng.randint(4, 12)
+            steps = max(8, min(70, int(base_steps * self.mouse_speed)))
 
-        ctrl_spread = max(20.0, dist * self.rng.uniform(0.15, 0.4))
+        ctrl_spread = max(20.0, dist * self.dynamic_rng.uniform(0.15, 0.45) * self.mouse_jitter)
         angle = math.atan2(end[1] - start[1], end[0] - start[0]) + math.pi / 2
         c1 = (
-            start[0] + (end[0] - start[0]) * 0.3 + math.cos(angle) * ctrl_spread * self.rng.uniform(-1, 1),
-            start[1] + (end[1] - start[1]) * 0.3 + math.sin(angle) * ctrl_spread * self.rng.uniform(-1, 1),
+            start[0] + (end[0] - start[0]) * 0.3 + math.cos(angle) * ctrl_spread * self.dynamic_rng.uniform(-1, 1),
+            start[1] + (end[1] - start[1]) * 0.3 + math.sin(angle) * ctrl_spread * self.dynamic_rng.uniform(-1, 1),
         )
         c2 = (
-            start[0] + (end[0] - start[0]) * 0.7 + math.cos(angle) * ctrl_spread * self.rng.uniform(-1, 1),
-            start[1] + (end[1] - start[1]) * 0.7 + math.sin(angle) * ctrl_spread * self.rng.uniform(-1, 1),
+            start[0] + (end[0] - start[0]) * 0.7 + math.cos(angle) * ctrl_spread * self.dynamic_rng.uniform(-1, 1),
+            start[1] + (end[1] - start[1]) * 0.7 + math.sin(angle) * ctrl_spread * self.dynamic_rng.uniform(-1, 1),
         )
 
         for i in range(1, steps + 1):
             raw_t = i / steps
             t = raw_t * raw_t * (3 - 2 * raw_t)
             px, py = _cubic_bezier(start, c1, c2, end, t)
-            px += self.rng.uniform(-0.6, 0.6)
-            py += self.rng.uniform(-0.6, 0.6)
+            px += self.dynamic_rng.uniform(-0.8, 0.8) * self.mouse_jitter
+            py += self.dynamic_rng.uniform(-0.8, 0.8) * self.mouse_jitter
             try:
                 await page.mouse.move(px, py)
             except Exception:
                 pass
             self._record("mousemove", x=round(px, 1), y=round(py, 1))
-            await asyncio.sleep(self.rng.uniform(0.006, 0.022))
+            await asyncio.sleep(self.dynamic_rng.uniform(0.006, 0.022) * self.mouse_speed)
 
         self._x, self._y = end
 
@@ -295,19 +309,187 @@ class HumanBehavior:
             return False
 
     async def think(self, lo: float = 0.3, hi: float = 1.5) -> None:
-        await asyncio.sleep(self.rng.uniform(lo, hi))
+        await asyncio.sleep(self.dynamic_rng.uniform(lo, hi) * self.think_multiplier)
 
     async def click(self, page: Any, x: Optional[float] = None, y: Optional[float] = None) -> None:
         if x is not None and y is not None:
             await self.move_to(page, x, y)
-        await asyncio.sleep(self.rng.uniform(0.04, 0.12))
+        await asyncio.sleep(self.dynamic_rng.uniform(0.04, 0.12) * self.mouse_speed)
         try:
             await page.mouse.down()
-            await asyncio.sleep(self.rng.uniform(0.03, 0.09))
+            await asyncio.sleep(self.dynamic_rng.uniform(0.03, 0.09) * self.mouse_speed)
             await page.mouse.up()
         except Exception:
             pass
         self._record("click", x=round(self._x, 1), y=round(self._y, 1))
+
+    async def type_text(self, page: Any, text: str, mistake_prob: float = 0.04) -> None:
+        """Types text with random delays and simulated mistakes + corrections."""
+        # Scale mistake probability by this bot's clumsiness trait
+        actual_mistake_prob = mistake_prob * self.mistake_multiplier
+        
+        for char in text:
+            # Random delay before next keystroke, scaled by typing speed trait
+            await asyncio.sleep(self.dynamic_rng.uniform(0.03, 0.12) * self.typing_speed)
+            
+            # Simulate a typo occasionally
+            if self.dynamic_rng.random() < actual_mistake_prob:
+                # Pick a random character to make a typo (simplified)
+                typo_char = self.dynamic_rng.choice("abcdefghijklmnopqrstuvwxyz0123456789")
+                try:
+                    await page.keyboard.type(typo_char)
+                except Exception:
+                    pass
+                
+                # Realize the mistake after a slight delay
+                await asyncio.sleep(self.dynamic_rng.uniform(0.1, 0.25) * self.typing_speed)
+                
+                # Press backspace to correct
+                try:
+                    await page.keyboard.press("Backspace")
+                except Exception:
+                    pass
+                await asyncio.sleep(self.dynamic_rng.uniform(0.08, 0.18) * self.typing_speed)
+                
+            # Type the correct character
+            try:
+                await page.keyboard.type(char)
+            except Exception:
+                pass
+        self._record("type", length=len(text))
+
+    async def scroll_to_element(self, page: Any, locator: Any, *, max_scrolls: int = 20) -> bool:
+        """Human-like scroll to bring a Playwright locator into viewport.
+
+        Instead of using Playwright's scrollIntoViewIfNeeded (which teleports
+        the scroll position), this method scrolls the page gradually using
+        mouse-wheel events in 80-200px increments, with occasional small
+        back-scrolls, until the element's bounding box is within the visible
+        viewport.  Returns True if the element became visible.
+        """
+        for attempt in range(max_scrolls):
+            try:
+                box = await locator.bounding_box()
+                if box:
+                    # Element is visible if its vertical centre is within viewport
+                    centre_y = box["y"] + box["height"] / 2
+                    if 0 <= centre_y <= self.vh:
+                        return True
+                    # Determine scroll direction
+                    if centre_y > self.vh:
+                        # Element is below viewport → scroll down
+                        delta = self.dynamic_rng.randint(80, 200)
+                    else:
+                        # Element is above viewport → scroll up
+                        delta = -self.dynamic_rng.randint(80, 200)
+                else:
+                    # Element exists in DOM but has no box yet → scroll down
+                    delta = self.dynamic_rng.randint(100, 220)
+
+                try:
+                    await page.mouse.wheel(0, delta)
+                except Exception:
+                    pass
+                self._record("scroll", deltaY=delta)
+                await asyncio.sleep(self.dynamic_rng.uniform(0.08, 0.22) * self.mouse_speed)
+
+                # Occasional back-scroll (20% chance) to look natural
+                if self.dynamic_rng.random() < 0.20:
+                    back = self.dynamic_rng.randint(20, 60) * (-1 if delta > 0 else 1)
+                    try:
+                        await page.mouse.wheel(0, back)
+                    except Exception:
+                        pass
+                    self._record("scroll", deltaY=back)
+                    await asyncio.sleep(self.dynamic_rng.uniform(0.05, 0.12))
+
+            except Exception:
+                # Element may not be in DOM yet
+                delta = self.dynamic_rng.randint(100, 220)
+                try:
+                    await page.mouse.wheel(0, delta)
+                except Exception:
+                    pass
+                self._record("scroll", deltaY=delta)
+                await asyncio.sleep(self.dynamic_rng.uniform(0.1, 0.2))
+
+        return False
+
+    async def human_scroll_search(
+        self,
+        page: Any,
+        check_fn,
+        *,
+        max_scroll_px: int = 3000,
+        step_px: int = 280,
+    ) -> bool:
+        """Gradually scroll down the page like a human scanning for content.
+
+        At each scroll step, calls ``check_fn(page)`` (an async callable that
+        returns True if the target was found).  Stops early when found or when
+        ``max_scroll_px`` total pixels have been scrolled.
+
+        Includes realistic behaviours: variable step sizes, occasional short
+        back-scrolls, brief pauses between steps, and a random mouse wander
+        every few steps.
+        """
+        scrolled = 0
+        step_count = 0
+        while scrolled < max_scroll_px:
+            # ── Check before scrolling further ──
+            try:
+                found = await check_fn(page)
+                if found:
+                    return True
+            except Exception:
+                pass
+
+            # ── Scroll down by a variable amount ──
+            actual_step = self.dynamic_rng.randint(
+                max(60, step_px - 100), step_px + 80
+            )
+            chunks = self.dynamic_rng.randint(2, 4)
+            per_chunk = actual_step // chunks
+            for _ in range(chunks):
+                try:
+                    await page.mouse.wheel(0, per_chunk)
+                except Exception:
+                    pass
+                await asyncio.sleep(
+                    self.dynamic_rng.uniform(0.04, 0.12) * self.mouse_speed
+                )
+            scrolled += actual_step
+            step_count += 1
+            self._record("scroll_search", totalScrolled=scrolled)
+
+            # Brief reading pause (like scanning the content)
+            await asyncio.sleep(
+                self.dynamic_rng.uniform(0.15, 0.4) * self.think_multiplier
+            )
+
+            # Occasional back-scroll (25% chance)
+            if self.dynamic_rng.random() < 0.25:
+                back = self.dynamic_rng.randint(30, 80)
+                try:
+                    await page.mouse.wheel(0, -back)
+                except Exception:
+                    pass
+                scrolled -= back
+                self._record("scroll_search", totalScrolled=max(0, scrolled))
+                await asyncio.sleep(self.dynamic_rng.uniform(0.06, 0.15))
+
+            # Every 3-4 steps, do a quick mouse wander (human eye scanning)
+            if step_count % self.dynamic_rng.randint(3, 5) == 0:
+                wx = self.dynamic_rng.randint(int(self.vw * 0.15), int(self.vw * 0.85))
+                wy = self.dynamic_rng.randint(int(self.vh * 0.3), int(self.vh * 0.7))
+                await self.move_to(page, wx, wy)
+                await asyncio.sleep(self.dynamic_rng.uniform(0.1, 0.3))
+
+        # Final check at max scroll depth
+        try:
+            return await check_fn(page)
+        except Exception:
+            return False
 
     def event_summary(self) -> Dict[str, int]:
         out = {"mousemove": 0, "scroll": 0, "seat_hover": 0, "click": 0}

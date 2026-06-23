@@ -71,15 +71,20 @@ graph TD
 
 ### 3.2. Proxy Rotator Service (บริการจัดการเครือข่าย)
 * **ISP Filter**: กรอง IP ที่มาจากเครื่องโฮสติ้งสาธารณะ (Datacenter IP เช่น AWS, Google Cloud) ออกไป เพื่อใช้เพียง Resident Proxy ของไทยที่มีคุณภาพสูงและเป็นไอพีบ้านจริง
-* **Lease System**: แจกจ่ายสิทธิ์การใช้งาน Proxy ให้กับ Worker แต่ละตัว (`LEASE_TTL = 45s`) เพื่อป้องกันไม่ให้ IP เดียวกันถูกใช้งานซ้ำซ้อนพร้อมกันในระดับวินาทีจนโดนแบน
+* **Lease System**: แจกจ่ายสิทธิ์การใช้งาน Proxy ให้กับ Worker แต่ตัว (`LEASE_TTL = 45s`) เพื่อป้องกันไม่ให้ IP เดียวกันถูกใช้งานซ้ำซ้อนพร้อมกันในระดับวินาทีจนโดนแบน
 
 ### 3.3. Manager Service (แอปพลิเคชันส่วนกลาง)
 * พัฒนาด้วย FastAPI ให้บริการ REST API แก่ Frontend และบรอดแคสต์ Logs ผ่าน **WebSockets (`/ws/logs`)**
 * มีระบบ `LocalRedis` จำลองสำหรับเก็บข้อมูลสำรองชั่วคราวกรณี Redis หลักตัดการเชื่อมต่อ
 
 ### 3.4. Worker Service (เครื่องจักรจองซื้อ)
-* พัฒนาด้วย Python 3.11 + Playwright/GraphQL
+* พัฒนาด้วย Python 3.11 + Playwright
 * มีระบบสร้างลายนิ้วมือเบราว์เซอร์อัตโนมัติ (**Antidetect Fingerprint Generator**) ทำการจำลองค่าสุ่มอย่างคงที่ตาม IP Proxy (Deterministic Seed) เช่น User-Agent, Viewport, WebGL Renderer, และจำนวนคอร์ของ CPU เพื่อสร้างความน่าเชื่อถือให้กับเซสชันการสั่งซื้อ
+
+### 3.5. AI Visual Recovery Module (ระบบกู้คืนพฤติกรรมภาพด้วย AI)
+* ทำงานแยกส่วนที่ไฟล์ `worker/ai_recovery.py` โดยเชื่อมต่อเข้ากับ **Gemini 1.5 Flash API** แบบ Multimodal
+* ทำหน้าที่เป็น Fallback เมื่อบอทติดด่านที่ตั้งขึ้นเฉพาะของเว็บเป้าหมาย (เช่น ปริศนาต่อภาพ, สลับเพลงชาติ, หมุนเข็มนาฬิกา หรือกล่องเลือกสี) โดยการสกรีนช็อตรูปภาพหน้าจอขนาด Viewport จริง ส่งไปให้ AI ประเมินแล้วถอดพิกัด `X, Y` หรือระยะการลากสไลเดอร์ส่งกลับมาให้ Playwright Mouse ทำงานแทน
+* มีระบบจำกัดการทำซ้ำ (Max Attempts = 3) ป้องกันการวนคลิกจุดเดิมเพื่อลดความเสี่ยงจากการแบน
 
 ---
 
@@ -89,20 +94,22 @@ graph TD
 
 | บริการ / ส่วนงาน | พาธของไฟล์ (File Path) | หน้าที่และความรับผิดชอบหลัก |
 | :--- | :--- | :--- |
-| **Global Infrastructure** | [docker-compose.yml](file:///c:/Users/jerks/OneDrive/Desktop/ttm-bot-2026/docker-compose.yml) | ไฟล์ตั้งค่าและควบคุม Docker Containers ทั้งหมด (Redis, Rotator, Manager, Worker) |
-| **Proxy Management** | [proxy-rotator/main.py](file:///c:/Users/jerks/OneDrive/Desktop/ttm-bot-2026/proxy-rotator/main.py) | ตรวจสอบ IP, แยกประเภทโฮสติ้ง, จัดสรร IP สลับหมุนเวียน |
-| **Dashboard Backend** | [manager/main.py](file:///c:/Users/jerks/OneDrive/Desktop/ttm-bot-2026/manager/main.py) | หลังบ้าน Dashboard, ให้บริการ WebSocket Logs และ API คอนฟิก |
-| **Dashboard Frontend** | [frontend/src/components/Setup.tsx](file:///c:/Users/jerks/OneDrive/Desktop/ttm-bot-2026/frontend/src/components/Setup.tsx) | ฟอร์มตั้งค่า GUI Dashboard รองรับการเปลี่ยนโหมดและบันทึกลงฐานข้อมูล |
-| **Dashboard Frontend** | [frontend/src/components/Dashboard.tsx](file:///c:/Users/jerks/OneDrive/Desktop/ttm-bot-2026/frontend/src/components/Dashboard.tsx) | หน้าควบคุมสถานะการทำงานบอทแบบเรียลไทม์ |
-| **Dashboard Frontend** | [frontend/src/components/BrowserProfiles.tsx](file:///c:/Users/jerks/OneDrive/Desktop/ttm-bot-2026/frontend/src/components/BrowserProfiles.tsx) | หน้าจอจำลองข้อมูลลายนิ้วมือเบราว์เซอร์และฮาร์ดแวร์ |
-| **Bot Worker Logic** | [worker/bot.py](file:///c:/Users/jerks/OneDrive/Desktop/ttm-bot-2026/worker/bot.py) | ตัวทำงานบอทหลัก สลับโหมดประมวลผลระหว่าง GraphQL API และ Playwright Browser |
-| **User Manual** | [คู่มือการใช้งานบอทกดบัตร ThaiTicket.txt](file:///c:/Users/jerks/OneDrive/Desktop/ttm-bot-2026/คู่มือการใช้งานบอทกดบัตร%20ThaiTicket.txt) | เอกสารแนะนำการติดตั้ง การตั้งค่า และเทคนิคการกดบัตร |
+| **Global Infrastructure** | [docker-compose.yml](file:///c:/dev/ttm-bot-2026/docker-compose.yml) | ไฟล์ตั้งค่าและควบคุม Docker Containers ทั้งหมด (Redis, Rotator, Manager, Worker) |
+| **Proxy Management** | [proxy-rotator/main.py](file:///c:/dev/ttm-bot-2026/proxy-rotator/main.py) | ตรวจสอบ IP, แยกประเภทโฮสติ้ง, จัดสรร IP สลับหมุนเวียน |
+| **Dashboard Backend** | [manager/main.py](file:///c:/dev/ttm-bot-2026/manager/main.py) | หลังบ้าน Dashboard, ให้บริการ WebSocket Logs และ API คอนฟิก |
+| **Dashboard Frontend** | [frontend/src/components/Setup.tsx](file:///c:/dev/ttm-bot-2026/frontend/src/components/Setup.tsx) | ฟอร์มตั้งค่า GUI Dashboard รองรับการเปลี่ยนโหมดและบันทึกลงฐานข้อมูล |
+| **Dashboard Frontend** | [frontend/src/components/Dashboard.tsx](file:///c:/dev/ttm-bot-2026/frontend/src/components/Dashboard.tsx) | หน้าควบคุมสถานะการทำงานบอทแบบเรียลไทม์ |
+| **Dashboard Frontend** | [frontend/src/components/BrowserProfiles.tsx](file:///c:/dev/ttm-bot-2026/frontend/src/components/BrowserProfiles.tsx) | หน้าจอจำลองข้อมูลลายนิ้วมือเบราว์เซอร์และฮาร์ดแวร์ |
+| **Bot Worker Logic** | [worker/bot.py](file:///c:/dev/ttm-bot-2026/worker/bot.py) | ตัวทำงานบอทหลัก สลับโหมดประมวลผลระหว่าง Queue-it และ General Mode |
+| **AI Visual Recovery** | [worker/ai_recovery.py](file:///c:/dev/ttm-bot-2026/worker/ai_recovery.py) | ระบบประเมินและแก้ปัญหาหน้าจออัตโนมัติด้วย Vision LLM (Gemini API) |
+| **User Manual** | [คู่มือการใช้งานบอทกดบัตร ThaiTicket.txt](file:///c:/dev/ttm-bot-2026/คู่มือการใช้งานบอทกดบัตร%20ThaiTicket.txt) | เอกสารแนะนำการติดตั้ง การตั้งค่า และเทคนิคการกดบัตร |
 
 ---
 
 ## 5. ข้อได้เปรียบและคุณลักษณะเด่นทางเทคนิค (Technical Advantages)
 
-1. **Dual-Mode Versatility**: รองรับทั้งการกดแบบยิง GraphQL ความเร็วสูง (สำหรับหน้าจองคอนเสิร์ตปกติ) และการใช้เว็บเบราว์เซอร์จริงประมวลผลหน้าเว็บปลายทาง (สำหรับเว็บทั่วไปที่มีระบบตรวจบอทหนาแน่น)
+1. **Dual-Mode Versatility**: รองรับทั้งการเข้าคิวปกติผ่านเบราว์เซอร์และการประมวลผลหน้าเว็บปลายทาง (สำหรับเว็บทั่วไปที่มีระบบตรวจบอทหนาแน่น)
 2. **Best-Effort Form Filler**: อัปเกรดฟังก์ชันวิเคราะห์ช่องกรอกข้อมูล โดยใช้ Playwright ค้นหาฟิลด์ชื่อ, นามสกุล, เบอร์โทร, และหมายเลขบัตรเครดิตแบบอัจฉริยะเพื่อเติมข้อมูลและกดเช็คเอาต์ได้ทันที
 3. **Anti-Detect Consistency**: จำลองสภาพแวดล้อมระบบปฏิบัติการและอุปกรณ์จริง (เช่น การจำลองการ์ดจอ NVIDIA/AMD และขนาดหน้าจอที่แตกต่างกัน) โดยเชื่อมข้อมูลลายนิ้วมือเข้ากับ Proxy ตัวเดิมอย่างสม่ำเสมอ หลบเลี่ยงตัวจับความผิดปกติของ Cloudflare
-4. **Instant Telegram Feedback**: ระบบจะส่งข้อความแจ้งเตือนทันทีที่มีบอทตัวใดตัวหนึ่งผ่านด่านคิวหรือทำรายการสั่งซื้อสำเร็จ พร้อมส่งลิงก์เพื่อให้คนเข้าไปชำระเงินต่อได้สะดวก
+4. **AI-Driven Visual Fallback**: สามารถแก้ปัญหาเฉพาะหน้าบนเบราว์เซอร์แบบไม่มีกฎตายตัว (Cognitive Tasks) เช่น CAPTCHA หมุนนาฬิกา, เลือกโทนสี หรือต่อภาพจิ๊กซอว์ โดยส่งสกรีนช็อตให้ AI วิเคราะห์ตำแหน่งคลิกย้อนกลับมาที่บอท
+5. **Instant Telegram Feedback**: ระบบจะส่งข้อความแจ้งเตือนทันทีที่มีบอทตัวใดตัวหนึ่งผ่านด่านคิวหรือทำรายการสั่งซื้อสำเร็จ พร้อมส่งลิงก์เพื่อให้คนเข้าไปชำระเงินต่อได้สะดวก

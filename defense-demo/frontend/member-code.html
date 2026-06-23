@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ThaiTicket Major — Member Verification</title>
+  <link rel="stylesheet" href="/static/ttm.css" />
+  <script src="/static/telemetry.js"></script>
+  <script src="/static/funnel-guard.js"></script>
+  <script src="/static/ttm-ui.js"></script>
+  <style>
+    body {
+      background: #f4f6f9;
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Outfit", "Segoe UI", system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      color: #1e293b;
+    }
+
+    /* White Header like screenshot */
+    .header-white {
+      background: #ffffff;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      border-bottom: 1px solid #e2e8f0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .header-left {
+      font-size: 24px;
+      color: #334155;
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      align-items: center;
+    }
+
+    .header-logo-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .header-logo-main {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 800;
+      font-size: 1.15rem;
+      color: #0f172a;
+      letter-spacing: 0.02em;
+    }
+
+    .header-logo-badge {
+      background: #dc2626;
+      color: #ffffff;
+      font-size: 0.65rem;
+      font-weight: 900;
+      padding: 2px 6px;
+      border-radius: 2px;
+    }
+
+    .header-logo-sub {
+      font-size: 0.6rem;
+      color: #64748b;
+      margin-top: -2px;
+      letter-spacing: 0.05em;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    /* CSS Flag Icon */
+    .flag-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      overflow: hidden;
+      border: 1px solid #e2e8f0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .flag-stripe-red { background: #A51931; height: 16.66%; }
+    .flag-stripe-white { background: #F4F5F8; height: 16.66%; }
+    .flag-stripe-blue { background: #2D2A4A; height: 33.34%; }
+
+    /* Red Circle Avatar J */
+    .avatar-j {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #dc2626;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 1rem;
+      user-select: none;
+    }
+
+    /* Main Container split view */
+    .main-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+      background: radial-gradient(circle at 50% 50%, rgba(244, 246, 249, 0.75) 0%, rgba(226, 232, 240, 0.95) 100%),
+                  url("/static/bts-poster.jpg") center/cover no-repeat;
+      background-blend-mode: multiply;
+      position: relative;
+    }
+
+    /* Glassmorphic card overlay for split view */
+    .split-card {
+      display: flex;
+      align-items: center;
+      gap: 60px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 20px;
+      padding: 40px;
+      max-width: 900px;
+      width: 100%;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+      animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes fadeInUp {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .poster-section {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .poster-img {
+      max-width: 380px;
+      width: 100%;
+      height: auto;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+      border: 1px solid #e2e8f0;
+      transition: transform 0.3s ease;
+    }
+
+    .poster-img:hover {
+      transform: scale(1.02);
+    }
+
+    .form-section {
+      flex: 1.2;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .form-title {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin-bottom: 20px;
+      color: #0f172a;
+    }
+
+    .input-wrapper {
+      position: relative;
+      margin-bottom: 24px;
+    }
+
+    .code-input {
+      width: 100%;
+      padding: 16px 20px;
+      border-radius: 30px;
+      border: 2px solid #cbd5e1;
+      background: #ffffff;
+      color: #0f172a;
+      font-size: 1.1rem;
+      outline: none;
+      transition: all 0.3s ease;
+      font-family: inherit;
+    }
+
+    .code-input::placeholder {
+      color: #94a3b8;
+    }
+
+    .code-input:focus {
+      border-color: #dc2626;
+      background: #ffffff;
+      box-shadow: 0 0 15px rgba(220, 38, 38, 0.15);
+    }
+
+    .submit-btn {
+      width: 100%;
+      padding: 16px;
+      border-radius: 30px;
+      border: none;
+      background: #dc2626;
+      color: #ffffff;
+      font-size: 1.15rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 4px 14px rgba(220, 38, 38, 0.4);
+    }
+
+    .submit-btn:hover {
+      background: #b91c1c;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(220, 38, 38, 0.6);
+    }
+
+    .submit-btn:active {
+      transform: translateY(0);
+    }
+
+    .error-msg {
+      margin-top: 16px;
+      color: #ef4444;
+      font-size: 0.95rem;
+      font-weight: 500;
+      text-align: center;
+      background: rgba(239, 68, 68, 0.05);
+      border: 1px solid rgba(239, 68, 68, 0.15);
+      padding: 10px;
+      border-radius: 8px;
+      display: none;
+    }
+
+    @media (max-width: 768px) {
+      .split-card {
+        flex-direction: column;
+        gap: 30px;
+        padding: 24px;
+      }
+      .poster-img {
+        max-width: 250px;
+      }
+      .form-title {
+        text-align: center;
+        font-size: 1.5rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- White Top Header -->
+  <header class="header-white">
+    <div class="header-left">
+      <span>☰</span>
+    </div>
+    <div class="header-logo-container">
+      <div class="header-logo-main">
+        <span class="header-logo-badge">TTM</span>
+        <span>THAITICKET MAJOR</span>
+      </div>
+      <div class="header-logo-sub">a ticketmaster company</div>
+    </div>
+    <div class="header-right">
+      <div class="flag-icon" title="Thailand">
+        <div class="flag-stripe-red"></div>
+        <div class="flag-stripe-white"></div>
+        <div class="flag-stripe-blue"></div>
+        <div class="flag-stripe-white"></div>
+        <div class="flag-stripe-red"></div>
+      </div>
+      <div class="avatar-j">J</div>
+    </div>
+  </header>
+
+  <!-- Main Body Content -->
+  <main class="main-container">
+    <div class="split-card">
+      <!-- Left: Concert Poster -->
+      <div class="poster-section">
+        <img class="poster-img" src="/static/bts-poster.jpg" alt="BTS WORLD TOUR 'ARIRANG' IN BANGKOK Concert Poster" />
+      </div>
+
+      <!-- Right: Code Entry Form -->
+      <div class="form-section">
+        <h2 class="form-title">กรุณาใส่โค้ด</h2>
+        <form id="code-form">
+          <div class="input-wrapper">
+            <input 
+              type="text" 
+              id="member-code-input" 
+              class="code-input" 
+              placeholder="กรุณาใส่โค้ด" 
+              required 
+              autocomplete="off" 
+              autofocus
+            />
+          </div>
+          <button type="submit" class="submit-btn">ตกลง</button>
+        </form>
+        <div id="error-message" class="error-msg"></div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      "use strict";
+
+      // 1. Verify queue token (funnel check)
+      const token = TTMFunnel.requireQueueToken();
+      if (!token) {
+        // requireQueueToken already alerts and redirects, but in case
+        return;
+      }
+
+      const form = document.getElementById("code-form");
+      const input = document.getElementById("member-code-input");
+      const errorDiv = document.getElementById("error-message");
+
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        const code = input.value.trim();
+
+        if (!code) {
+          showError("กรุณากรอกรหัสสมาชิก");
+          return;
+        }
+
+        if (code.length < 4) {
+          showError("รหัสสมาชิกต้องมีความยาวอย่างน้อย 4 ตัวอักษร");
+          return;
+        }
+
+        // Save member code to localStorage
+        localStorage.setItem("defense_member_code", code);
+        
+        // Track the verification step in telemetry
+        if (window.DefenseTelemetry && typeof DefenseTelemetry.track === "function") {
+          DefenseTelemetry.track("funnel", { step: "member_code_verified" });
+        }
+
+        // Redirect to seat map page
+        location.href = "/seats";
+      });
+
+      function showError(msg) {
+        errorDiv.textContent = msg;
+        errorDiv.style.display = "block";
+        input.focus();
+      }
+    })();
+  </script>
+</body>
+</html>

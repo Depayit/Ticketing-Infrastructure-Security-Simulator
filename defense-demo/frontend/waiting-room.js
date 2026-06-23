@@ -3,7 +3,7 @@
 
   const EVENT = window.TTM_EVENT || {
     id: "demo-concert-2026",
-    name: "2026-27 JACOB WORLD TOUR IN BANGKOK",
+    name: "BTS WORLD TOUR 'ARIRANG' IN BANGKOK",
   };
 
   const STORAGE_KEY = "ttm_waiting_room_state";
@@ -21,15 +21,13 @@
   };
 
   const now = Date.now();
-  const saleStartMs = isDemo
-    ? now + 8000
-    : parseInt(localStorage.getItem("ttm_sale_start_ms") || "0", 10) || now + 5 * 60 * 1000;
+  let saleStartMs = parseInt(localStorage.getItem("ttm_sale_start_ms") || "0", 10) || now + 5 * 60 * 1000;
 
   if (!localStorage.getItem("ttm_sale_start_ms")) {
     localStorage.setItem("ttm_sale_start_ms", String(saleStartMs));
   }
 
-  const preLoginStartMs = saleStartMs - CONFIG.preLoginMinutes * 60 * 1000;
+  let preLoginStartMs = saleStartMs - CONFIG.preLoginMinutes * 60 * 1000;
   const queueId = getOrCreateQueueId();
 
   let state = loadState();
@@ -44,6 +42,7 @@
   let sensorReady = false;
   let botScore = null;
   let queueJoined = false;
+  let pollCount = 0;
 
   const els = {
     demoBadge: document.getElementById("demo-badge"),
@@ -81,7 +80,14 @@
   function getOrCreateQueueId() {
     let id = sessionStorage.getItem("ttm_queue_id");
     if (!id) {
-      id = crypto.randomUUID();
+      if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        id = crypto.randomUUID();
+      } else {
+        id = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
+          var r = Math.random() * 16 | 0, v = c == "x" ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
+      }
       sessionStorage.setItem("ttm_queue_id", id);
     }
     return id;
@@ -265,6 +271,7 @@
   }
 
   function showQueue() {
+    pollCount = 0;
     showPhase(els.phaseQueue);
     saveState({ inQueue: true, joinedQueue: true });
     updateProgress(queueProgress);
@@ -356,6 +363,12 @@
   }
 
   async function pollQueueStatus() {
+    if (pollCount >= 15) {
+      showDefenseError("Layer 2 (Queue): เกินขีดจำกัดการโพล (สูงสุด 15 ครั้ง) — กรุณาเข้าคิวใหม่");
+      clearTimers();
+      return;
+    }
+    pollCount++;
     try {
       const data = await funnelRequest("/api/funnel/queue-status", {
         eventId: CONFIG.eventId,
@@ -383,10 +396,19 @@
         updateQueuePosition(qs.queuePosition, qs.botScore);
       }
 
+      if (qs?.status === "pre_queue") {
+        saleStartMs = qs.startTime * 1000;
+        localStorage.setItem("ttm_sale_start_ms", String(saleStartMs));
+        clearTimers();
+        saveState({ inQueue: false, joinedQueue: false, loggedIn: true });
+        showCountdown();
+        return;
+      }
+
       if (qs?.status === "admitted" && qs.token) {
         clearTimers();
         updateProgress(100);
-        setTimeout(() => showAdmitted(qs.token, qs.issuedAt), 500);
+        setTimeout(() => triggerFinalCaptcha(qs.token, qs.issuedAt), 500);
         return;
       }
     } catch (err) {
@@ -436,7 +458,24 @@
     showEntryZone();
   }
 
-  function boot() {
+  async function boot() {
+    try {
+      const data = await funnelRequest("/api/funnel/queue-status", {
+        eventId: CONFIG.eventId,
+        joinQueue: false,
+      });
+      const qs = data?.data?.queueStatus;
+      if (qs?.status === "pre_queue" && qs?.startTime) {
+        saleStartMs = qs.startTime * 1000;
+        localStorage.setItem("ttm_sale_start_ms", String(saleStartMs));
+      } else if (qs?.startTime === 0) {
+        saleStartMs = Date.now() - 1000; // already started
+      }
+      preLoginStartMs = saleStartMs - CONFIG.preLoginMinutes * 60 * 1000;
+    } catch (err) {
+      console.warn("initial queue status fetch failed", err);
+    }
+
     clearTimers();
     setEventCopy();
     updateStatusTimestamp();
@@ -475,7 +514,13 @@
     e.preventDefault();
     const email = document.getElementById("login-email")?.value?.trim();
     const password = document.getElementById("login-password")?.value;
-    if (!email || !password) return;
+    const captcha = document.getElementById("login-captcha")?.checked;
+    
+    if (!email || !password || !captcha) {
+      if (!captcha) alert("กรุณายืนยันว่าคุณไม่ใช่โปรแกรมอัตโนมัติ (CAPTCHA)");
+      return;
+    }
+    
     saveState({ loggedIn: true, email });
     DefenseTelemetry.track("funnel", { step: "login", email });
     if (Date.now() >= saleStartMs) showEntryZone();
@@ -518,8 +563,224 @@
   });
 
   els.btnEnterSeats?.addEventListener("click", () => {
-    location.href = "/seats";
+    location.href = "/member-code";
   });
+
+  /* --- FINAL CAPTCHA LOGIC --- */
+  let captchaTimeoutId = null;
+  let captchaSeconds = 60;
+  let activeCaptchaType = -1;
+  let finalToken = null;
+  let finalIssuedAt = null;
+
+  function triggerFinalCaptcha(token, issuedAt) {
+    finalToken = token;
+    finalIssuedAt = issuedAt;
+    els.finalCaptchaModal = document.getElementById("final-captcha-modal");
+    els.finalCaptchaModal.classList.remove("hidden");
+    startCaptchaTimer();
+    
+    document.querySelectorAll(".captcha-type-container").forEach(el => el.classList.add("hidden"));
+    
+    activeCaptchaType = Math.floor(Math.random() * 5); // 0 to 4
+    
+    if (activeCaptchaType === 0) initCaptchaQuiz();
+    else if (activeCaptchaType === 1) initCaptchaSlider();
+    else if (activeCaptchaType === 2) initCaptchaColor();
+    else if (activeCaptchaType === 3) initCaptchaSort("fan");
+    else if (activeCaptchaType === 4) initCaptchaSort("lyric");
+  }
+
+  function startCaptchaTimer() {
+    captchaSeconds = 60;
+    const timerEl = document.getElementById("captcha-countdown");
+    timerEl.innerText = `00:00:${captchaSeconds}`;
+    timerEl.style.color = "#111";
+    
+    captchaTimeoutId = setInterval(() => {
+      captchaSeconds--;
+      let secStr = captchaSeconds < 10 ? "0" + captchaSeconds : captchaSeconds;
+      timerEl.innerText = `00:00:${secStr}`;
+      if (captchaSeconds <= 10) timerEl.style.color = "#dc2626";
+      
+      if (captchaSeconds <= 0) {
+        captchaFail("หมดเวลา กรุณาต่อคิวใหม่");
+      }
+    }, 1000);
+  }
+
+  function captchaFail(reason) {
+    clearInterval(captchaTimeoutId);
+    alert(reason);
+    location.reload();
+  }
+
+  function captchaSuccess() {
+    clearInterval(captchaTimeoutId);
+    els.finalCaptchaModal.classList.add("hidden");
+    showAdmitted(finalToken, finalIssuedAt);
+  }
+
+  function initCaptchaQuiz() {
+    document.getElementById("captcha-quiz").classList.remove("hidden");
+    const questions = [
+      { q: "เวทีคอนเสิร์ตครั้งแรกของ BTS ในประเทศไทยคือเวทีคอนเสิร์ตใด", a: "7 สีคอนเสิร์ต", opts: ["BTS WORLD TOUR 'ARIRANG' IN BANGKOK", "BTS WORLD TOUR 'LOVE YOURSELF' BANGKOK", "BTS LIVE TRILOGY EPISODE III THE WINGS TOUR in Bangkok", "7 สีคอนเสิร์ต"] }
+    ];
+    const q = questions[0];
+    document.getElementById("quiz-question-text").innerText = q.q;
+    const container = document.getElementById("quiz-options-container");
+    container.innerHTML = "";
+    
+    const shuffledOpts = [...q.opts].sort(() => Math.random() - 0.5);
+    shuffledOpts.forEach(opt => {
+      const btn = document.createElement("button");
+      btn.className = "quiz-option-btn";
+      btn.innerText = opt;
+      btn.onclick = () => {
+        if (opt === q.a) captchaSuccess();
+        else captchaFail("ตอบคำถามผิด กรุณาต่อคิวใหม่");
+      };
+      container.appendChild(btn);
+    });
+  }
+
+  function initCaptchaSlider() {
+    document.getElementById("captcha-slider").classList.remove("hidden");
+    const input = document.getElementById("slider-input");
+    const piece = document.getElementById("slider-piece");
+    const btn = document.getElementById("btn-verify-slider");
+    
+    // Dynamically create the target slot if it doesn't exist
+    let slot = document.getElementById("slider-slot");
+    if (!slot) {
+      slot = document.createElement("div");
+      slot.id = "slider-slot";
+      const area = document.querySelector(".slider-puzzle-area");
+      if (area) area.appendChild(slot);
+    }
+    
+    const targetPercent = 50 + Math.random() * 35;
+    input.value = 0;
+    piece.style.left = "10px";
+    slot.style.left = `calc(${targetPercent}% - ${targetPercent * 0.5}px)`;
+    
+    input.oninput = (e) => {
+      const val = parseInt(e.target.value);
+      piece.style.left = `calc(${val}% - ${val * 0.5}px)`;
+    };
+    
+    btn.onclick = () => {
+      const val = parseInt(input.value);
+      if (Math.abs(val - targetPercent) < 8) captchaSuccess();
+      else captchaFail("เลื่อนจิ๊กซอว์ไม่ตรง กรุณาต่อคิวใหม่");
+    };
+  }
+
+  function initCaptchaColor() {
+    document.getElementById("captcha-color").classList.remove("hidden");
+    const targetBox = document.getElementById("color-target");
+    const grid = document.getElementById("color-grid");
+    const btn = document.getElementById("btn-verify-color");
+    
+    const colors = ["#f97316", "#ec4899", "#eab308", "#0ea5e9", "#22c55e", "#ef4444", "#8b5cf6", "#64748b", "#0f172a", "#14b8a6", "#d946ef", "#84cc16"];
+    const targetColor = colors[Math.floor(Math.random() * colors.length)];
+    targetBox.style.backgroundColor = targetColor;
+    
+    grid.innerHTML = "";
+    let selectedColor = null;
+    
+    const shuffledColors = [...colors].sort(() => Math.random() - 0.5);
+    shuffledColors.forEach(c => {
+      const div = document.createElement("div");
+      div.className = "color-box";
+      div.style.backgroundColor = c;
+      div.onclick = () => {
+        document.querySelectorAll(".color-box").forEach(el => el.classList.remove("selected"));
+        div.classList.add("selected");
+        selectedColor = c;
+        btn.disabled = false;
+        btn.innerText = "Verify";
+        btn.classList.remove("disabled");
+      };
+      grid.appendChild(div);
+    });
+    
+    btn.onclick = () => {
+      if (selectedColor === targetColor) captchaSuccess();
+      else captchaFail("เลือกสีผิด กรุณาต่อคิวใหม่");
+    };
+  }
+
+  function initCaptchaSort(type) {
+    document.getElementById("captcha-sort-" + type).classList.remove("hidden");
+    const list = document.getElementById("sortable-" + type);
+    const btn = document.getElementById("btn-verify-" + type);
+    list.innerHTML = "";
+    
+    let items = [];
+    if (type === "fan") {
+      items = [
+        { id: 0, text: "ส่วนที่ 1 (ภาพใบหน้า)", class: "fan-0" },
+        { id: 1, text: "ส่วนที่ 2 (คอเสื้อ)", class: "fan-1" },
+        { id: 2, text: "ส่วนที่ 3 (ข้อความ FINAL EP)", class: "fan-2" },
+        { id: 3, text: "ส่วนที่ 4 (ข้อความ FAN MEETING)", class: "fan-3" },
+        { id: 4, text: "ส่วนที่ 5 (รายชื่อนักแสดง)", class: "fan-4" }
+      ];
+    } else {
+      items = [
+        { id: 0, text: "เอกราชจะไม่ให้ใครข่มขี่", class: "lyric-0" },
+        { id: 1, text: "รักสามัคคี ไทยนี้รักสงบ แต่ถึงรบไม่ขลาด", class: "lyric-1" },
+        { id: 2, text: "อยู่ดำรงคงไว้ได้ทั้งมวล ด้วยไทยล้วนหมาย", class: "lyric-2" },
+        { id: 3, text: "ประเทศไทยรวมเลือดเนื้อชาติเชื้อไทย", class: "lyric-3" },
+        { id: 4, text: "เป็นประชารัฐ ไผทของไทยทุกส่วน", class: "lyric-4" }
+      ];
+    }
+    
+    const shuffled = [...items].sort(() => Math.random() - 0.5);
+    
+    shuffled.forEach(item => {
+      const div = document.createElement("div");
+      div.className = "sortable-item " + (item.class || "");
+      div.innerText = item.text;
+      div.draggable = true;
+      div.dataset.id = item.id;
+      
+      div.addEventListener("dragstart", () => div.classList.add("dragging"));
+      div.addEventListener("dragend", () => div.classList.remove("dragging"));
+      list.appendChild(div);
+    });
+    
+    list.addEventListener("dragover", e => {
+      e.preventDefault();
+      const afterElement = getDragAfterElement(list, e.clientY);
+      const draggable = document.querySelector(".dragging");
+      if (afterElement == null) {
+        list.appendChild(draggable);
+      } else {
+        list.insertBefore(draggable, afterElement);
+      }
+    });
+    
+    btn.onclick = () => {
+      let currentOrder = Array.from(list.children).map(el => parseInt(el.dataset.id));
+      let isCorrect = currentOrder.every((val, index) => val === index);
+      if (isCorrect) captchaSuccess();
+      else captchaFail("เรียงภาพผิด กรุณาต่อคิวใหม่");
+    };
+  }
+
+  function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.sortable-item:not(.dragging)')];
+    return draggableElements.reduce((closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        return { offset: offset, element: child };
+      } else {
+        return closest;
+      }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+  }
 
   initAkamaiSensor().finally(() => boot());
 })();

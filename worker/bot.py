@@ -1,4 +1,4 @@
-﻿import httpx
+import httpx
 import asyncio
 import json
 import random
@@ -9,59 +9,35 @@ import hashlib
 import redis
 import telegram
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from urllib.parse import urlparse
 from playwright.async_api import async_playwright
 
 # Browser-side stealth toolkit (fingerprint + behaviour + JS injection).
-# This bot is browser-only — there is no GraphQL/HTTP purchase path.
 import stealth
+from ai_recovery import AIVisualRecoveryManager
+
+# Import refactored packages
+import core.config
+import core.proxy
+import core.logger
+import browser.context
+import browser.challenge
+import flows.queue
+import flows.purchase
+import flows.checkout
+import flows.forms
 
 # ── Config loading ─────────────────────────────────────────────────────────────
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
-
-def _load_config_from_file() -> dict:
-    try:
-        with open("config.json") as f:
-            return json.load(f)
-    except Exception:
-        return {}
-
-def _load_config_from_redis(r: redis.Redis) -> Optional[dict]:
-    try:
-        raw = r.get("ttm:config")
-        if raw:
-            return json.loads(raw)
-    except Exception:
-        pass
-    return None
-
-def load_config(r: redis.Redis) -> dict:
-    cfg = _load_config_from_redis(r)
-    if cfg:
-        return cfg
-    return _load_config_from_file()
-
 r = redis.from_url(REDIS_URL, decode_responses=True)
-config = load_config(r)
+config = core.config.load_config(r)
 
-_tg_bot: Optional[telegram.Bot] = None
-_tg_token: str = ""
+def get_tg_bot_instances() -> List[tuple[telegram.Bot, str]]:
+    return core.config.get_tg_bot_instances(config)
 
 def get_tg_bot() -> Optional[telegram.Bot]:
-    global _tg_bot, _tg_token
-    token = config.get("telegram_token", "")
-    if not token or token.startswith("YOUR_"):
-        _tg_bot = None
-        _tg_token = ""
-        return None
-    if _tg_bot is None or _tg_token != token:
-        _tg_bot = telegram.Bot(token=token)
-        _tg_token = token
-    return _tg_bot
-
-QUEUE_CAPTCHA_URL_TPL = "https://www.thaiticketmajor.com/concert/{event_id}"
-
+    return core.config.get_tg_bot(config)
 
 # ── TTMWorker ─────────────────────────────────────────────────────────────────
 
@@ -72,19 +48,23 @@ class TTMWorker:
         self.worker_key = f"worker:{self.instance_id}"
         self.success = False
         self.current_profile_idx = 0
+        self.status = "STANDBY"
+        self.current_url = "N/A"
+        self.last_log = "Worker initialized"
+        self.proxy = "direct"
         self._refresh_config()
+        self.ai_recovery = AIVisualRecoveryManager(
+            api_key=config.get("gemini_api_key") or config.get("captcha_key"),
+            model_name=config.get("ai_model", "gemini-2.5-pro")
+        )
 
     # ── config ─────────────────────────────────────────────────────────────────
 
     def _refresh_config(self):
         global config
-        config = load_config(r)
-        # Browser-only bot. "queueit" = real TTM/Queue-it funnel (default),
-        # "general" = generic button-click automation. (legacy "ttm" GraphQL
-        # mode has been removed.)
+        config = core.config.load_config(r)
+        
         self.bot_mode: str = config.get("bot_mode", "queueit")
-        if self.bot_mode == "ttm":
-            self.bot_mode = "queueit"
         self.target_url: str = config.get("target_url", "")
         self.click_selector: str = config.get("click_selector", "button:has-text('Add to Cart'), button:has-text('ซื้อเลย'), button:has-text('ใส่ตะกร้า')")
         self.refresh_mode: str = config.get("refresh_mode", "auto_refresh")
@@ -93,18 +73,21 @@ class TTMWorker:
         self.event_id: str = config.get("event_id", "")
         self.proxies: List[str] = config.get("proxies", [])
         self.profiles: List[Dict] = config.get("profiles", [])
-        self.ticket_priorities: List[str] = config.get(
-            "ticket_priorities", ["VIP", "GA", "Standing"]
-        )
+        self.ticket_priorities: List[str] = config.get("ticket_priorities", ["VIP", "GA", "Standing"])
+        self.membership_code: str = config.get("membership_code", "")
+        
         self.browser_profiles: List[Dict] = config.get("browser_profiles", [])
         self.proxy_rotator_url: str = os.environ.get("PROXY_ROTATOR_URL") or config.get("proxy_rotator_url", "http://proxy-rotator:8080")
         self.proxies_per_worker: int = int(config.get("proxies_per_worker", 5))
 
-        # ── Queue-it browser flow (bot_mode == "queueit") ─────────────────────
+        self.ticket_count: int = 1
+        self.ticket_buyers: List[str] = []
+        self.current_profile: Dict = {}
+
         qi = config.get("queueit", {}) or {}
-        self.qi_headless: bool = bool(qi.get("headless", True))
-        # Selector groups — each is a comma-separated CSS list; we also fall
-        # back to text matching for the standard Queue-it widget labels.
+        # Force headless mode in Docker container environment to prevent XServer launch failure.
+        self.qi_headless: bool = True if os.path.exists("/.dockerenv") else bool(qi.get("headless", True))
+        self.qi_manual_takeover: bool = bool(qi.get("manual_takeover", False))
         self.qi_book_selector: str = qi.get(
             "book_selector",
             "a:has-text('จอง'), a:has-text('ซื้อบัตร'), button:has-text('จอง'), "
@@ -120,8 +103,11 @@ class TTMWorker:
         )
         self.qi_seat_selector: str = qi.get(
             "seat_selector",
-            ".seat:not(.sold):not(.unavailable), .zone-available, [data-seat-available='true'], "
-            "li.available, .seatAvailable",
+            ".seat:not(.sold):not(.unavailable), .seat.available, .seat.open, .seat-available, "
+            ".zone-available, .zone-clickable, .zone-open, [data-zone-status='available'], "
+            "[data-seat-available='true'], [data-status='available'], "
+            "li.available, .seatAvailable, "
+            "svg .seat-circle:not(.sold), svg rect.available, svg .seat-node:not(.unavailable)",
         )
         self.qi_addtocart_selector: str = qi.get(
             "addtocart_selector",
@@ -129,411 +115,135 @@ class TTMWorker:
             "button:has-text('สั่งซื้อ'), button:has-text('ดำเนินการต่อ'), "
             "button:has-text('Confirm'), button:has-text('ยืนยัน')",
         )
-        # Markers that mean "still inside the Queue-it waiting flow".
         self.qi_queue_markers: List[str] = qi.get(
-            "queue_markers", ["queue-it.net", "queue-it", "/waiting", "entry zone", "buying queue"],
+            "queue_markers", ["queue-it.net", "queue-it", "/waiting", "entry zone", "buying queue", "defense-gateway"],
         )
-        # Keep the seat-holding session alive (sec) for manual payment.
         self.qi_hold_seconds: int = int(qi.get("hold_seconds", 600))
         self.qi_max_minutes: int = int(qi.get("max_minutes", 120))
-        # Multi-instance: stop ALL workers on the first successful hold, or
-        # let each worker hold its own seat independently (more tickets).
         self.qi_stop_on_first: bool = bool(qi.get("stop_on_first", True))
 
+        self.qi_show_date_preference: str = str(qi.get("show_date_preference", "")).strip()
+        self.qi_show_dates: List[str] = qi.get("show_dates", [
+            "วันพฤหัสบดีที่ 3 ธันวาคม 2569",
+            "วันเสาร์ที่ 5 ธันวาคม 2569",
+            "วันอาทิตย์ที่ 6 ธันวาคม 2569",
+        ])
+
+        self.qi_seat_color_priorities: List[str] = qi.get("seat_color_priorities", [])
+        self.qi_zone_name_priorities: List[str] = qi.get("zone_name_priorities", []) or self.ticket_priorities
+        self.qi_auto_scroll: bool = bool(qi.get("auto_scroll_for_buttons", True))
+        self.qi_max_scroll_px: int = int(qi.get("max_scroll_search_px", 3000))
+
+        hv = config.get("human_verification", {}) or qi.get("human_verification", {}) or {}
+        self.hv_markers: List[str] = list(hv.get("markers") or core.config.DEFAULT_HV_MARKERS)
+        self.hv_robot_texts: List[str] = list(hv.get("robot_texts") or core.config.DEFAULT_HV_ROBOT_TEXTS)
+        self.hv_proceed_texts: List[str] = list(hv.get("proceed_texts") or core.config.DEFAULT_HV_PROCEED_TEXTS)
+
     async def _update_leased_proxies(self):
-        """
-        Dynamically acquire/lease proxies from the Proxy Rotator service.
-        Prevents duplicates across workers.
-        """
-        url = f"{self.proxy_rotator_url}/api/proxies/acquire"
-        payload = {
-            "worker_id": self.instance_id,
-            "count": self.proxies_per_worker
-        }
+        fallback = config.get("proxies", [])
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
-                resp = await client.post(url, json=payload)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    new_proxies = data.get("proxies", [])
-                    if new_proxies:
-                        if set(self.proxies) != set(new_proxies):
-                            await self.send_log(
-                                f"🌐 Proxy Rotator: Swapped/updated leased proxies. Active count: {len(new_proxies)}", 
-                                "INFO"
-                            )
-                        self.proxies = new_proxies
-                else:
-                    raise Exception(f"HTTP {resp.status_code}")
-        except Exception as e:
-            # Fallback to local config list if empty
-            if not self.proxies:
-                self.proxies = config.get("proxies", [])
-            await self.send_log(
-                f"⚠️ Rotator contact error: {e}. Fallback to {len(self.proxies)} static proxies.",
-                "WARN"
+            self.proxies = await core.proxy.acquire_proxies(
+                self.proxy_rotator_url,
+                self.instance_id,
+                self.proxies_per_worker,
+                fallback
             )
+        except Exception:
+            self.proxies = fallback
 
     async def _proxy_lease_loop(self):
-        """Background coroutine to periodically renew and fetch leased proxies."""
         while not self.success:
-            await self._update_leased_proxies()
-            await asyncio.sleep(15)
-
+            await asyncio.sleep(45)
+            if not self.success:
+                await self._update_leased_proxies()
 
     def _generate_deterministic_profile(self, proxy: str) -> Dict:
-        """
-        Dynamically and deterministically generate a unique, highly realistic 
-        browser profile based on the proxy string as a seed. This ensures that:
-        1. A proxy always gets the exact same browser profile across restarts.
-        2. Different proxies get distinct, realistic profiles.
-        3. No manual setup is needed even when running hundreds of workers.
-        """
-        import random
-        rng = random.Random(proxy)
-        
-        browser = rng.choice(['chrome', 'chrome', 'chrome', 'edge', 'firefox'])
-        
-        chrome_versions = ['128.0.6613.120', '129.0.6668.89', '130.0.6723.58', '130.0.6723.116', '131.0.6778.85', '131.0.6778.108']
-        edge_versions = ['128.0.2739.67', '129.0.2792.89', '130.0.2849.52', '131.0.2903.70']
-        firefox_versions = ['127.0', '128.0', '129.0', '130.0', '131.0']
-        
-        if browser == 'chrome':
-            version = rng.choice(chrome_versions)
-        elif browser == 'edge':
-            version = rng.choice(edge_versions)
-        else:
-            version = rng.choice(firefox_versions)
-            
-        gpu_pool = [
-            {"vendor": "Google Inc. (NVIDIA)", "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4090 Direct3D11 vs_5_0 ps_5_0, D3D11)"},
-            {"vendor": "Google Inc. (NVIDIA)", "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4080 Direct3D11 vs_5_0 ps_5_0, D3D11)"},
-            {"vendor": "Google Inc. (NVIDIA)", "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Ti Direct3D11 vs_5_0 ps_5_0, D3D11)"},
-            {"vendor": "Google Inc. (NVIDIA)", "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4070 Direct3D11 vs_5_0 ps_5_0, D3D11)"},
-            {"vendor": "Google Inc. (NVIDIA)", "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3090 Direct3D11 vs_5_0 ps_5_0, D3D11)"},
-            {"vendor": "Google Inc. (NVIDIA)", "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3080 Direct3D11 vs_5_0 ps_5_0, D3D11)"},
-            {"vendor": "Google Inc. (NVIDIA)", "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3070 Direct3D11 vs_5_0 ps_5_0, D3D11)"},
-            {"vendor": "Google Inc. (NVIDIA)", "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Ti Direct3D11 vs_5_0 ps_5_0, D3D11)"},
-            {"vendor": "Google Inc. (NVIDIA)", "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)"},
-            {"vendor": "Google Inc. (AMD)", "renderer": "ANGLE (AMD, AMD Radeon RX 7900 XTX Direct3D11 vs_5_0 ps_5_0, D3D11)"},
-            {"vendor": "Google Inc. (AMD)", "renderer": "ANGLE (AMD, AMD Radeon RX 7800 XT Direct3D11 vs_5_0 ps_5_0, D3D11)"},
-            {"vendor": "Google Inc. (AMD)", "renderer": "ANGLE (AMD, AMD Radeon RX 6800 XT Direct3D11 vs_5_0 ps_5_0, D3D11)"},
-            {"vendor": "Google Inc. (Intel)", "renderer": "ANGLE (Intel, Intel(R) Iris(R) Xe Graphics Direct3D11 vs_5_0 ps_5_0, D3D11)"},
-            {"vendor": "Google Inc. (Intel)", "renderer": "ANGLE (Intel, Intel(R) Arc(TM) A770 Graphics Direct3D11 vs_5_0 ps_5_0, D3D11)"}
-        ]
-        gpu = rng.choice(gpu_pool)
-        
-        viewport_pool = [
-            {"w": 1920, "h": 1080},
-            {"w": 2560, "h": 1440},
-            {"w": 1366, "h": 768},
-            {"w": 1536, "h": 864},
-            {"w": 1440, "h": 900},
-            {"w": 1280, "h": 800}
-        ]
-        vp = rng.choice(viewport_pool)
-        
-        concurrency = rng.choice([4, 6, 8, 12, 16])
-        memory = rng.choice([4, 8, 16, 32])
-        
-        major = version.split('.')[0]
-        
-        if browser == 'chrome':
-            ua = f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{version} Safari/537.36"
-            sec_ch_ua = f'"Chromium";v="{major}", "Google Chrome";v="{major}", "Not-A.Brand";v="99"'
-        elif browser == 'edge':
-            cver = f"{major}.0.0.0"
-            ua = f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{cver} Safari/537.36 Edg/{version}"
-            sec_ch_ua = f'"Chromium";v="{major}", "Microsoft Edge";v="{major}", "Not-A.Brand";v="24"'
-        else:
-            ua = f"Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:{version}) Gecko/20100101 Firefox/{version}"
-            sec_ch_ua = ""
-            
-        return {
-            "browser": browser,
-            "browser_version": version,
-            "os": "windows",
-            "os_version": "10.0",
-            "user_agent": ua,
-            "platform": "Win32",
-            "language": "th-TH,th;q=0.9,en-US;q=0.8,en;q=0.7",
-            "sec_ch_ua": sec_ch_ua,
-            "sec_ch_ua_platform": "Windows",
-            "viewport_width": vp["w"],
-            "viewport_height": vp["h"],
-            "screen_width": vp["w"],
-            "screen_height": vp["h"],
-            "color_depth": 24,
-            "timezone": "Asia/Bangkok",
-            "hardware_concurrency": concurrency,
-            "device_memory": memory,
-            "webgl_vendor": gpu["vendor"],
-            "webgl_renderer": gpu["renderer"],
-            "do_not_track": False,
-            "touch_support": False
-        }
+        return core.proxy.generate_deterministic_profile(proxy)
 
     def _get_browser_profile(self, proxy: str) -> Dict:
-        """
-        Deterministically assign a browser profile to a proxy so each proxy
-        always uses the same fingerprint (consistent across retries), but
-        different proxies get different profiles.
-        """
-        profiles = self.browser_profiles
-        if profiles and len(profiles) >= len(self.proxies):
-            idx = int(hashlib.md5(proxy.encode()).hexdigest(), 16) % len(profiles)
-            return profiles[idx]
-        return self._generate_deterministic_profile(proxy)
+        return core.proxy.get_browser_profile(proxy, self.browser_profiles, self.proxies)
+
+    def _apply_buyer_profile(self, proxy: str):
+        self.current_profile = core.proxy.get_buyer_profile(proxy, self.profiles, self.proxies)
+        self.ticket_count = int(self.current_profile.get("ticket_count", 1))
+        
+        configured_buyers = self.current_profile.get("ticket_buyers", [])
+        self.ticket_buyers = []
+        
+        if self.ticket_count >= 1:
+            first_buyer = configured_buyers[0] if len(configured_buyers) > 0 and configured_buyers[0].strip() else self.current_profile.get("fullname", "")
+            self.ticket_buyers.append(first_buyer)
+            
+        if self.ticket_count > 1:
+            dummy_firsts = ["สมชาย", "สมศักดิ์", "สมหญิง", "มาลี", "วิชัย", "นงนุช", "กฤษณะ", "พงศกร", "ศิริพร", "รัตนา"]
+            dummy_lasts = ["รักดี", "ใจดี", "มีสุข", "เจริญพร", "มั่งคั่ง", "สวัสดี", "มั่นคง", "พิทักษ์", "สายทอง", "งามเลิศ"]
+            
+            for i in range(1, self.ticket_count):
+                if i < len(configured_buyers) and configured_buyers[i].strip():
+                    self.ticket_buyers.append(configured_buyers[i])
+                else:
+                    dummy_name = f"{random.choice(dummy_firsts)} {random.choice(dummy_lasts)}"
+                    self.ticket_buyers.append(dummy_name)
 
     def _parse_playwright_proxy(self, proxy_str: str) -> Optional[dict]:
-        try:
-            if not proxy_str.startswith("http://") and not proxy_str.startswith("https://"):
-                proxy_str = "http://" + proxy_str
-            parsed = urlparse(proxy_str)
-            server = f"{parsed.scheme or 'http'}://{parsed.hostname}"
-            if parsed.port:
-                server += f":{parsed.port}"
-            proxy_config = {"server": server}
-            if parsed.username:
-                proxy_config["username"] = parsed.username
-            if parsed.password:
-                proxy_config["password"] = parsed.password
-            return proxy_config
-        except Exception:
-            return None
+        return browser.context.parse_playwright_proxy(proxy_str)
 
-    async def _run_auto_checkout(self, page) -> bool:
-        """
-        Attempts to autofill checkout forms using the first Buyer Profile.
-        This is a best-effort general form filler.
-        """
-        try:
-            if not self.profiles:
-                await self.send_log("⚠️ ไม่มีโปรไฟล์ผู้ซื้อสำหรับใช้กรอกฟอร์ม Auto-Checkout", "WARN")
-                return False
-                
-            profile = self.profiles[0]
-            card = profile.get("card", {})
-            
-            await self.send_log("🤖 เริ่มการกรอกข้อมูลอัตโนมัติ (Auto-Checkout Best-effort)...")
-            
-            inputs = await page.locator("input, select").all()
-            for inp in inputs:
-                try:
-                    name = (await inp.get_attribute("name") or "").lower()
-                    placeholder = (await inp.get_attribute("placeholder") or "").lower()
-                    inp_type = (await inp.get_attribute("type") or "").lower()
-                    inp_id = (await inp.get_attribute("id") or "").lower()
-                    
-                    if "email" in name or "email" in placeholder or inp_type == "email":
-                        await inp.fill(profile["email"])
-                        continue
-                        
-                    if "phone" in name or "tel" in name or "phone" in placeholder or inp_type == "tel" or "phone" in inp_id:
-                        await inp.fill(profile["phone"])
-                        continue
-                        
-                    if "name" in name or "fullname" in name or "name" in placeholder or "name" in inp_id:
-                        if "first" in name or "first" in placeholder or "first" in inp_id:
-                            await inp.fill(profile["fullname"].split()[0])
-                        elif "last" in name or "last" in placeholder or "last" in inp_id:
-                            parts = profile["fullname"].split()
-                            await inp.fill(parts[1] if len(parts) > 1 else parts[0])
-                        else:
-                            await inp.fill(profile["fullname"])
-                        continue
-                        
-                    if "id_card" in name or "national" in name or "citizen" in name or "id" in placeholder or "citizen" in placeholder:
-                        if profile.get("id_card"):
-                            await inp.fill(profile["id_card"])
-                        continue
-                        
-                    if "cardnumber" in name or "number" in name or "card" in placeholder or "number" in placeholder or "card" in inp_id:
-                        if "card" in name or "card" in placeholder or "card" in inp_id:
-                            await inp.fill(card.get("number", ""))
-                        continue
-                        
-                    if "exp" in name or "date" in name or "exp" in placeholder or "exp" in inp_id:
-                        exp_val = card.get("exp", "")
-                        if len(exp_val) == 4:
-                            await inp.fill(f"{exp_val[:2]}/{exp_val[2:]}")
-                        continue
-                        
-                    if "cvv" in name or "cvc" in name or "security" in placeholder or "cvv" in placeholder or "cvv" in inp_id:
-                        await inp.fill(card.get("cvv", ""))
-                        continue
-                        
-                except Exception:
-                    pass
-            
-            await self.send_log("✅ กรอกข้อมูลเบื้องต้นเรียบร้อยแล้ว กรุณาตรวจสอบและดำเนินการต่อเพื่อความปลอดภัย", "SUCCESS")
-            return True
-        except Exception as e:
-            await self.send_log(f"❌ Auto-Checkout เกิดข้อผิดพลาด: {e}", "ERROR")
-            return False
+    # ── Ticket quantity & registration ──────────────────────────────────────
 
-    async def run_general_mode(self):
-        """
-        Runs the browser automation mode using Playwright.
-        Each worker gets its own browser instance.
-        """
-        await self.send_log("🚀 เริ่มต้นโหมด General Website (Browser Automation)...")
-        
-        # Acquire/lease healthy proxies from the Rotator
-        await self._update_leased_proxies()
-        
-        target_url = self.target_url
-        click_selector = self.click_selector
-        refresh_mode = self.refresh_mode
-        refresh_interval = self.refresh_interval
-        action_after_click = self.action_after_click
+    async def _qi_select_ticket_quantity(self, page, behavior=None) -> bool:
+        return await flows.purchase.select_ticket_quantity(page, behavior, self.ticket_count, self.send_log)
 
-        
-        if not target_url:
-            await self.send_log("❌ กรุณาตั้งค่า Target URL ในหน้า Setup ก่อนเริ่มต้นบอท", "ERROR")
-            while not self.target_url:
-                await asyncio.sleep(5)
-                self._refresh_config()
-                target_url = self.target_url
-            
-        proxy_str = self.proxies[0] if self.proxies else None
-        proxy_config = None
-        if proxy_str:
-            proxy_config = self._parse_playwright_proxy(proxy_str)
-            await self.send_log(f"🌐 ใช้ Proxy สำหรับ Browser: {proxy_str[-15:]}")
-            
-        bp = self._get_browser_profile(proxy_str or "default_seed")
-        user_agent = bp.get("user_agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-        viewport = {"width": bp.get("viewport_width", 1280), "height": bp.get("viewport_height", 800)}
-        
-        async with async_playwright() as p:
-            await self.send_log("⚙️ กำลังสร้างบราวเซอร์เซสชัน...")
-            try:
-                browser = await p.chromium.launch(
-                    headless=True,
-                    proxy=proxy_config,
-                    args=[
-                        "--disable-blink-features=AutomationControlled",
-                        "--no-sandbox",
-                        "--disable-setuid-sandbox",
-                    ]
-                )
-                
-                context = await browser.new_context(
-                    user_agent=user_agent,
-                    viewport=viewport,
-                    locale=bp.get("language", "th-TH"),
-                    timezone_id=bp.get("timezone", "Asia/Bangkok"),
-                )
-                
-                await context.add_init_script("""
-                    Object.defineProperty(navigator, 'webdriver', {
-                        get: () => undefined
-                    });
-                """)
-                
-                page = await context.new_page()
-                await self.send_log(f"🔗 กำลังเปิดหน้าเว็บเป้าหมาย: {target_url}")
-                await page.goto(target_url, timeout=60000, wait_until="domcontentloaded")
-                await self.send_log("📄 โหลดหน้าเว็บเรียบร้อยแล้ว เฝ้ารอปุ่มสั่งซื้อ...")
-                
-                attempts = 0
-                while not self.success:
-                    if await self.global_stopped() or not await self.is_running():
-                        await self.send_log("⏹ STOP — บอทถูกสั่งหยุดทำงาน")
-                        break
-                        
-                    try:
-                        button = page.locator(click_selector).first
-                        count = await button.count()
-                        
-                        if count > 0:
-                            is_disabled = False
-                            try:
-                                is_disabled = await button.get_attribute("disabled") is not None
-                                if not is_disabled:
-                                    classes = (await button.get_attribute("class") or "").lower()
-                                    if "disabled" in classes or "disabled" in (await button.inner_text()).lower():
-                                        is_disabled = True
-                            except Exception:
-                                pass
-                                
-                            if not is_disabled:
-                                await self.send_log("🎯 เจอปุ่มสั่งซื้อที่พร้อมกดแล้ว! กำลังทำการคลิก...", "SUCCESS")
-                                await button.click()
-                                await self.send_log("✅ คลิกปุ่มสำเร็จแล้ว!", "SUCCESS")
-                                
-                                if action_after_click == "notify":
-                                    await self.send_log("📢 [Success] บอทคลิกสั่งซื้อเรียบร้อย! โปรดดำเนินการต่อในบราวเซอร์หรือตรวจสอบความถูกต้อง", "SUCCESS")
-                                    await self.set_global_stop()
-                                    self.success = True
-                                    await asyncio.sleep(180)
-                                    break
-                                elif action_after_click == "auto_checkout":
-                                    await self._run_auto_checkout(page)
-                                    await self.send_log("📢 [Success] บอทกรอกข้อมูลชำระเงินเรียบร้อย! โปรดเข้าหน้าเว็บเพื่อทำการตรวจสอบ/กดชำระเงินต่อ", "SUCCESS")
-                                    await self.set_global_stop()
-                                    self.success = True
-                                    await asyncio.sleep(180)
-                                    break
-                            else:
-                                attempts += 1
-                                if attempts % 10 == 0:
-                                    await self.send_log(f"⏳ เจอปุ่มแต่ยังอยู่ในสถานะล็อก/ปิดการใช้งาน (Disabled) - รอบที่ {attempts}", "DEBUG")
-                        else:
-                            attempts += 1
-                            if attempts % 10 == 0:
-                                await self.send_log(f"🔍 ยังไม่พบปุ่มเป้าหมายบนหน้านี้ - รอบที่ {attempts}", "DEBUG")
-                                
-                    except Exception as e:
-                        await self.send_log(f"เกิดข้อผิดพลาดในการหาปุ่ม: {e}", "WARN")
-                        
-                    if refresh_mode == "auto_refresh":
-                        await asyncio.sleep(refresh_interval)
-                        try:
-                            await page.reload(timeout=30000, wait_until="domcontentloaded")
-                        except Exception as e:
-                            await self.send_log(f"🔄 รีเฟรชหน้าเว็บล้มเหลว: {e}", "WARN")
-                    else:
-                        await asyncio.sleep(0.5)
-                        
-            except Exception as e:
-                await self.send_log(f"❌ Playwright เกิดข้อผิดพลาดรุนแรง: {e}", "ERROR")
-                await asyncio.sleep(5)
-            finally:
-                try:
-                    await browser.close()
-                except Exception:
-                    pass
+    async def _qi_fill_registration_names(self, page, behavior=None) -> bool:
+        return await flows.forms.fill_registration_names(page, behavior, self.ticket_buyers, self.send_log)
 
-    # ── logging ────────────────────────────────────────────────────────────────
+    async def _qi_select_promptpay_payment(self, page, behavior=None) -> bool:
+        return await flows.checkout.select_promptpay_payment(page, behavior, self.send_log)
+
+    async def _qi_notify_payment_ready(self, page, proxy: Optional[str]) -> None:
+        await flows.checkout.notify_payment_ready(
+            page, proxy, self.instance_id, self.qi_hold_seconds, r, config, self.send_log
+        )
+
+    # ── logging and state ──────────────────────────────────────────────────────
 
     async def send_log(self, message: str, level: str = "INFO"):
-        log_line = f"[{datetime.now().strftime('%H:%M:%S')}] [{level}] [{self.instance_id}] {message}"
-        print(log_line)
-        try:
-            r.lpush("ttm:logs", log_line)
-            r.ltrim("ttm:logs", 0, 100)
-        except Exception:
-            pass
-        try:
-            bot = get_tg_bot()
-            if bot:
-                await bot.send_message(
-                    chat_id=config.get("telegram_chat_id", ""),
-                    text=f"<b>[{self.instance_id}]</b> {message}",
-                    parse_mode="HTML",
-                )
-        except Exception:
-            pass
+        log_line = core.logger.send_log_sync(
+            r, self.instance_id, self.worker_key, message, level, config, self.update_status
+        )
+        self.last_log = message
+        self.update_status()
+        await core.logger.send_log_async(r, self.instance_id, message, level, config)
 
-    # ── lifecycle ──────────────────────────────────────────────────────────────
+    def update_status(self, status: str = None, url: str = None):
+        if status is not None:
+            self.status = status
+        if url is not None:
+            self.current_url = url
+        if hasattr(self, "proxies") and self.proxies:
+            self.proxy = self.proxies[0]
+        else:
+            self.proxy = "direct"
+        vw = getattr(self, "viewport_width", 1920)
+        vh = getattr(self, "viewport_height", 1080)
+        core.logger.update_status_in_redis(
+            r, self.worker_key, self.heartbeat_ttl, self.instance_id,
+            self.status, self.current_url, self.last_log, self.proxy,
+            viewport_width=vw, viewport_height=vh
+        )
 
     def register_worker(self):
-        r.setex(self.worker_key, self.heartbeat_ttl, datetime.now().isoformat())
+        self.update_status()
 
     def heartbeat(self):
-        r.setex(self.worker_key, self.heartbeat_ttl, datetime.now().isoformat())
+        self.update_status()
+
+    async def _heartbeat_loop(self):
+        while True:
+            try:
+                self.heartbeat()
+            except Exception:
+                pass
+            await asyncio.sleep(5)
 
     def unregister_worker(self):
         r.delete(self.worker_key)
@@ -544,210 +254,245 @@ class TTMWorker:
     async def is_running(self) -> bool:
         return r.get("ttm:running") == "1"
 
+    async def is_worker_stopped(self) -> bool:
+        return r.get(f"ttm:stop:{self.instance_id}") == "1"
+
     async def set_global_stop(self):
         r.set("ttm:global_stop", "1", ex=7200)
         r.incr("ttm:success_count")
         await self.send_log("🚨 ได้บัตรสำเร็จ! สั่งหยุดทุก worker แล้ว", "SUCCESS")
 
-    # ── CAPTCHA ────────────────────────────────────────────────────────────────
-
-    async def solve_captcha(self, sitekey: str, page_url: str) -> Optional[str]:
-        captcha_key = config.get("captcha_key", "")
-        if not captcha_key or captcha_key.startswith("YOUR_"):
-            return None
-
-        async with httpx.AsyncClient(timeout=15.0) as client:
+    async def _live_stream_task(self, page):
+        import base64
+        while True:
             try:
-                resp = await client.post(
-                    "http://2captcha.com/in.php",
-                    data={
-                        "key": captcha_key,
-                        "method": "turnstile",
-                        "googlekey": sitekey,
-                        "pageurl": page_url,
-                        "json": 1,
-                    },
-                )
-                task_id = resp.json().get("request")
-                if not task_id:
-                    return None
-                for _ in range(40):
-                    await asyncio.sleep(2.5)
-                    res = await client.get(
-                        "http://2captcha.com/res.php",
-                        params={
-                            "key": captcha_key,
-                            "action": "get",
-                            "id": task_id,
-                            "json": 1,
-                        },
-                    )
-                    data = res.json()
-                    if data.get("status") == 1:
-                        return data.get("request")
-            except Exception as e:
-                await self.send_log(f"CAPTCHA error: {e}", "ERROR")
-        return None
+                if r.get(f"ttm:live_stream:{self.instance_id}") == "1":
+                    if not page.is_closed():
+                        screenshot_bytes = await page.screenshot(type="jpeg", quality=40)
+                        b64 = base64.b64encode(screenshot_bytes).decode('utf-8')
+                        r.setex(f"ttm:live_frame:{self.instance_id}", 10, b64)
+                    await asyncio.sleep(0.5)
+                else:
+                    await asyncio.sleep(1.0)
+            except Exception:
+                await asyncio.sleep(1.0)
+                if page.is_closed():
+                    break
 
-    # ── Queue-it aware browser flow ─────────────────────────────────────────────
+    async def _check_screenshot_command(self, page):
+        req_id = r.get(f"ttm:cmd:screenshot:{self.instance_id}")
+        if req_id:
+            try:
+                r.delete(f"ttm:cmd:screenshot:{self.instance_id}")
+                await self.send_log("📸 AI Controller สั่งแคปหน้าจอ...", "INFO")
+                await asyncio.sleep(0.5)
+                screenshot_bytes = await page.screenshot(type="jpeg", quality=60)
+                import base64
+                b64 = base64.b64encode(screenshot_bytes).decode('utf-8')
+                r.setex(f"ttm:screenshot:{req_id}", 60, b64)
+            except Exception as e:
+                await self.send_log(f"⚠️ ถ่ายภาพหน้าจอไม่สำเร็จ: {e}", "WARN")
+
+    async def _control_listener_task(self, page):
+        import redis.asyncio as aioredis
+        async_r = aioredis.from_url(REDIS_URL, decode_responses=True)
+        pubsub = async_r.pubsub()
+        await pubsub.subscribe(f"ttm:control:{self.instance_id}")
+        try:
+            while not page.is_closed():
+                try:
+                    msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=0.1)
+                    if msg and msg.get("type") == "message":
+                        data_str = msg.get("data")
+                        if data_str:
+                            data = json.loads(data_str)
+                            act_type = data.get("type")
+                            if act_type == "click":
+                                x = float(data.get("x", 0))
+                                y = float(data.get("y", 0))
+                                await self.send_log(f"🖱️ รีโมท: คลิกพิกัด ({x}, {y})", "INFO")
+                                await page.mouse.click(x, y)
+                            elif act_type == "type":
+                                text = str(data.get("text", ""))
+                                await self.send_log(f"⌨️ รีโมท: พิมพ์ข้อความ '{text}'", "INFO")
+                                await page.keyboard.type(text)
+                            elif act_type == "keypress":
+                                key = str(data.get("key", ""))
+                                await self.send_log(f"⌨️ รีโมท: กดปุ่ม '{key}'", "INFO")
+                                await page.keyboard.press(key)
+                except Exception:
+                    pass
+                await asyncio.sleep(0.05)
+        finally:
+            try:
+                await pubsub.unsubscribe(f"ttm:control:{self.instance_id}")
+                await pubsub.close()
+                await async_r.close()
+            except Exception:
+                pass
+
+    async def _run_manual_takeover_loop(self, page, proxy_str):
+        self.update_status("MANUAL_CONTROL", page.url)
+        await self.send_log("🚨 [MANUAL TAKEOVER] บอทผ่านคิวแล้ว! เปิดหน้าจอ Live View เพื่อควบคุมมือได้ทันที...", "SUCCESS")
+        
+        # Turn on live stream automatically for 1 hour
+        r.setex(f"ttm:live_stream:{self.instance_id}", 3600, "1")
+        
+        while not self.success:
+            if await self.global_stopped() or not await self.is_running() or await self.is_worker_stopped():
+                await self.send_log("⏹ STOP [MANUAL TAKEOVER] — ออกจากโหมดควบคุมมือ")
+                break
+            if page.is_closed():
+                break
+            await asyncio.sleep(1.0)
 
     def _qi_frames(self, page):
-        """All frames to search — Queue-it widgets often live in an iframe
-        (or on queue-it.net), so we scan the main page and every child frame."""
-        try:
-            return [page] + [f for f in page.frames]
-        except Exception:
-            return [page]
+        return browser.challenge.get_qi_frames(page)
 
-    async def _qi_click_text(self, page, behavior, texts: List[str]) -> bool:
-        """Click the first visible button/link/role=button matching any text,
-        searching the main page AND all iframes, with a human-like click."""
-        for frame in self._qi_frames(page):
-            for txt in texts:
-                for sel in (
-                    f"button:has-text('{txt}')",
-                    f"a:has-text('{txt}')",
-                    f"[role=button]:has-text('{txt}')",
-                    f"input[value='{txt}']",
-                ):
-                    try:
-                        loc = frame.locator(sel).first
-                        if await loc.count() == 0 or not await loc.is_visible():
-                            continue
-                        box = await loc.bounding_box()
-                        if box and frame == page:
-                            await behavior.click(
-                                page, box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
-                            )
-                        else:
-                            await loc.click(timeout=3000)
-                        return True
-                    except Exception:
-                        continue
-        return False
+    async def _human_challenge_visible(self, page) -> bool:
+        return await browser.challenge.is_human_challenge_visible(page, self.hv_markers)
 
-    async def _qi_try_selector(self, page, behavior, selector: str) -> bool:
-        """Human-click the first match of a CSS selector list (main + frames)."""
-        for frame in self._qi_frames(page):
-            try:
-                loc = frame.locator(selector).first
-                if await loc.count() == 0 or not await loc.is_visible():
-                    continue
-                box = await loc.bounding_box()
-                if box and frame == page:
-                    await behavior.click(
-                        page, box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
-                    )
-                else:
-                    await loc.click(timeout=3000)
-                return True
-            except Exception:
-                continue
-        return False
+    async def _human_click_locator(self, page, frame, loc, behavior=None) -> bool:
+        return await browser.challenge.human_click_locator(page, frame, loc, behavior)
+
+    async def _try_tick_robot_checkbox(self, page, behavior=None) -> bool:
+        return await browser.challenge.try_tick_robot_checkbox(page, behavior, self.hv_robot_texts)
+
+    async def _try_click_proceed_after_human_check(self, page, behavior=None) -> bool:
+        return await browser.challenge.try_click_proceed_after_human_check(page, behavior, self.hv_proceed_texts)
+
+    async def _try_human_verification(self, page, behavior=None) -> bool:
+        return await browser.challenge.solve_human_challenge(
+            page, behavior, self.hv_markers, self.hv_robot_texts, self.hv_proceed_texts,
+            self.update_status, self.send_log
+        )
+
+    async def _qi_click_text(self, page, behavior, texts: List[str], wait_hidden: bool = False) -> bool:
+        return await flows.queue.click_text(page, behavior, texts, wait_hidden)
+
+    async def _qi_try_selector(self, page, behavior, selector: str, hover_delay: bool = True) -> bool:
+        return await flows.purchase.try_selector(page, behavior, selector, hover_delay)
+
+    async def _qi_scroll_and_try_selector(self, page, behavior, selector: str, max_px: int = 0) -> bool:
+        return await flows.purchase.scroll_and_try_selector(page, behavior, selector, max_px or self.qi_max_scroll_px)
+
+    async def _qi_select_show_date(self, page, behavior=None) -> bool:
+        return await flows.purchase.select_show_date(page, behavior, self.qi_show_date_preference, self.qi_show_dates, self.send_log)
 
     async def _qi_in_queue(self, page) -> bool:
-        """True while the page still looks like a Queue-it waiting screen."""
-        try:
-            url = (page.url or "").lower()
-            if any(m.lower() in url for m in self.qi_queue_markers if "/" in m or "." in m):
-                return True
-            for frame in self._qi_frames(page):
-                try:
-                    body = (await frame.inner_text("body"))[:4000].lower()
-                except Exception:
-                    continue
-                for m in ("entry zone", "buying queue", "waiting room", "you are now in",
-                          "please wait", "your turn", "ห้องรอ", "กำลังรอ"):
-                    if m in body:
-                        return True
-        except Exception:
-            pass
-        return False
+        return await flows.queue.is_in_queue(page, self.qi_queue_markers)
 
     async def _qi_on_purchase_page(self, page) -> bool:
-        """Heuristic: released from the queue onto a seat/cart page."""
-        try:
-            for frame in self._qi_frames(page):
-                try:
-                    if await frame.locator(self.qi_seat_selector).count() > 0:
-                        return True
-                    if await frame.locator(self.qi_addtocart_selector).count() > 0:
-                        return True
-                    body = (await frame.inner_text("body"))[:4000].lower()
-                except Exception:
-                    continue
-                if any(k in body for k in ("เลือกที่นั่ง", "เลือกโซน", "select seat", "ใส่ตะกร้า", "add to cart")):
-                    return True
-        except Exception:
-            pass
-        return False
+        return await flows.queue.is_on_purchase_page(page, self.qi_queue_markers, self.qi_seat_selector, self.qi_addtocart_selector)
 
-    async def _qi_notify_payment_ready(self, page, proxy: Optional[str]) -> None:
-        """Hold-only deliverable: capture proof + handoff data so a human can
-        finish payment (OTP/3DS) on the already-warmed session."""
-        url = ""
-        shot_path = ""
-        cookie_str = ""
-        try:
-            url = page.url
-        except Exception:
-            pass
-        try:
-            shot_path = f"/app/payment_ready_{self.instance_id}.png"
-            await page.screenshot(path=shot_path, full_page=True)
-        except Exception:
-            shot_path = ""
-        try:
-            ctx_cookies = await page.context.cookies()
-            cookie_str = "; ".join(f"{c['name']}={c['value']}" for c in ctx_cookies)
-        except Exception:
-            pass
+    # ── Seat selection with scroll + AI color priorities ────────────────
 
-        handoff = {
-            "worker": self.instance_id,
-            "proxy": (proxy[-16:] if proxy else "direct"),
-            "checkout_url": url,
-            "cookies": cookie_str,
-            "ts": datetime.now().isoformat(),
+    def _build_seat_context(self, scroll_info: Dict) -> Dict:
+        return {
+            "seat_color_priorities": self.qi_seat_color_priorities or None,
+            "zone_name_priorities": self.qi_zone_name_priorities or None,
+            "scroll_info": scroll_info,
+            "show_dates": self.qi_show_dates or None,
+            "show_date_preference": self.qi_show_date_preference or None,
         }
-        try:
-            r.lpush("ttm:payment_ready", json.dumps(handoff))
-            r.ltrim("ttm:payment_ready", 0, 50)
-        except Exception:
-            pass
 
-        await self.send_log(
-            f"🎟️ HOLD สำเร็จ! ล็อกที่นั่งได้แล้ว — เปิดลิงก์นี้เพื่อจ่าย (เหลือเวลา ~{self.qi_hold_seconds // 60} นาที):\n{url}",
-            "SUCCESS",
-        )
+    async def _qi_get_scroll_info(self, page) -> Dict:
         try:
-            bot = get_tg_bot()
-            if bot and shot_path:
-                with open(shot_path, "rb") as fh:
-                    await bot.send_photo(
-                        chat_id=config.get("telegram_chat_id", ""),
-                        photo=fh,
-                        caption=f"🎟️ ล็อกที่นั่งสำเร็จ ({handoff['proxy']})\nจ่ายต่อที่: {url}",
-                    )
+            info = await page.evaluate("""() => ({
+                scrollY: window.scrollY || window.pageYOffset || 0,
+                pageHeight: document.documentElement.scrollHeight || document.body.scrollHeight || 0,
+                viewportHeight: window.innerHeight || 0,
+                isScrollable: (document.documentElement.scrollHeight || 0) > (window.innerHeight || 0) + 50
+            })""")
+            return {
+                "current_scroll_y": int(info.get("scrollY", 0)),
+                "page_height": int(info.get("pageHeight", 0)),
+                "viewport_height": int(info.get("viewportHeight", 0)),
+                "is_scrollable": bool(info.get("isScrollable", False)),
+            }
         except Exception:
-            pass
+            return {"current_scroll_y": 0, "page_height": 0, "viewport_height": 0, "is_scrollable": False}
+
+    async def _qi_smart_seat_selection(self, page, behavior) -> bool:
+        await self._qi_select_show_date(page, behavior)
+        await asyncio.sleep(random.uniform(0.3, 0.6))
+
+        scroll_info = await self._qi_get_scroll_info(page)
+        seat_context = self._build_seat_context(scroll_info)
+
+        if self.qi_seat_color_priorities:
+            await self.send_log(f"🎨 AI Seat: ลำดับสี = {self.qi_seat_color_priorities}", "INFO")
+        if self.qi_zone_name_priorities:
+            await self.send_log(f"🏟️ AI Seat: ลำดับโซน = {self.qi_zone_name_priorities}", "INFO")
+
+        seat_clicked = await self._qi_try_selector(page, behavior, self.qi_seat_selector)
+        if seat_clicked:
+            await self.send_log("✅ CSS selector เจอที่นั่งว่าง — คลิกแล้ว", "INFO")
+            await behavior.think(0.3, 0.8)
+        else:
+            if self.qi_auto_scroll:
+                await self.send_log("📜 ไม่เจอที่นั่งในหน้าจอ — กำลัง scroll ลงหา...", "INFO")
+                seat_clicked = await self._qi_scroll_and_try_selector(
+                    page, behavior, self.qi_seat_selector, max_px=self.qi_max_scroll_px
+                )
+                if seat_clicked:
+                    await self.send_log("✅ Scroll แล้วเจอที่นั่งว่าง — คลิกแล้ว", "INFO")
+                    await behavior.think(0.3, 0.8)
+
+        if not seat_clicked:
+            await self.send_log("🤖 CSS ไม่เจอ — ส่ง AI วิเคราะห์ที่นั่งพร้อมลำดับสี/โซน...", "INFO")
+            scroll_info = await self._qi_get_scroll_info(page)
+            seat_context = self._build_seat_context(scroll_info)
+            try:
+                ai_recovered = await asyncio.wait_for(
+                    self.ai_recovery.attempt_recovery(
+                        page, screenshot_dir="/app/tmp",
+                        behavior=behavior, phase="seat_selection",
+                        seat_context=seat_context,
+                    ),
+                    timeout=40.0,
+                )
+                if ai_recovered:
+                    await self.send_log("🤖 AI วิเคราะห์และช่วยเลือกที่นั่ง/โซนสำเร็จ", "SUCCESS")
+                    seat_clicked = True
+                    await behavior.think(0.5, 1.0)
+            except asyncio.TimeoutError:
+                await self.send_log("⏰ AI seat analysis timeout", "DEBUG")
+            except Exception as ai_err:
+                await self.send_log(f"⚠️ AI seat selection ขัดข้อง: {ai_err}", "DEBUG")
+
+        cart_clicked = False
+        if seat_clicked:
+            cart_clicked = await self._qi_try_selector(page, behavior, self.qi_addtocart_selector)
+            if not cart_clicked and self.qi_auto_scroll:
+                await self.send_log("📜 กำลัง scroll หาปุ่ม 'ใส่ตะกร้า'...", "INFO")
+                cart_clicked = await self._qi_scroll_and_try_selector(page, behavior, self.qi_addtocart_selector, max_px=1500)
+        else:
+            cart_clicked = await self._qi_try_selector(page, behavior, self.qi_addtocart_selector)
+            if not cart_clicked and self.qi_auto_scroll:
+                cart_clicked = await self._qi_scroll_and_try_selector(page, behavior, self.qi_addtocart_selector, max_px=1500)
+
+        if not seat_clicked and not cart_clicked:
+            scroll_info = await self._qi_get_scroll_info(page)
+            seat_context = self._build_seat_context(scroll_info)
+            try:
+                recovered = await self.ai_recovery.attempt_recovery(
+                    page, screenshot_dir="/app/tmp",
+                    behavior=behavior, phase="add_to_cart",
+                    seat_context=seat_context,
+                )
+                if recovered:
+                    await self.send_log("🤖 AI ช่วยดำเนินการในหน้าซื้อบัตร", "SUCCESS")
+                    cart_clicked = await self._qi_try_selector(page, behavior, self.qi_addtocart_selector)
+            except Exception as ai_err:
+                await self.send_log(f"⚠️ AI Recovery ขัดข้อง: {ai_err}", "DEBUG")
+
+        return cart_clicked
 
     async def run_queueit_mode(self):
-        """Full ThaiTicketMajor + Queue-it browser flow (hold-only).
-
-        State machine mirroring the real funnel:
-          event page → click book → wait pre-queue countdown →
-          Join the Queue → answer "Still here?" → wait progress bar →
-          released → pick seat → add to cart → HOLD + notify human to pay.
-
-        Multi-instance: each worker drives its own stealthed Chromium on its
-        own leased proxy, so it holds an independent queue position. A small
-        per-worker join jitter avoids identical timing across the fleet.
-        """
-        from playwright.async_api import async_playwright
-
         await self.send_log("🎫 เริ่มโหมด Queue-it Browser Flow (Hold-only)...")
         await self._update_leased_proxies()
+        asyncio.create_task(self._proxy_lease_loop())
 
         while not self.target_url:
             await self.send_log("❌ ตั้งค่า Target URL (หน้า event) ก่อนเริ่ม", "ERROR")
@@ -758,109 +503,396 @@ class TTMWorker:
         proxy_cfg = self._parse_playwright_proxy(proxy_str) if proxy_str else None
         seed = proxy_str or self.instance_id
         bp = self._get_browser_profile(seed)
+        self._apply_buyer_profile(seed)
         fp = stealth.build_fingerprint(bp, seed)
         stealth_js = stealth.build_stealth_script(fp)
         viewport = {"width": int(fp.get("viewport_width", 1920)), "height": int(fp.get("viewport_height", 1080))}
 
         async with async_playwright() as p:
-            browser = await p.chromium.launch(
-                headless=self.qi_headless,
-                proxy=proxy_cfg,
-                args=[
-                    "--disable-blink-features=AutomationControlled",
-                    "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage",
-                ],
+            browser_instance, context, page = await browser.context.create_stealth_browser(
+                p, self.qi_headless, proxy_str, fp, viewport, stealth_js
             )
-            context = await browser.new_context(
-                user_agent=fp.get("user_agent"),
-                viewport=viewport,
-                device_scale_factor=float(fp.get("device_pixel_ratio", 1.0)),
-                locale=(fp.get("language") or "th-TH").split(",")[0],
-                timezone_id=fp.get("timezone", "Asia/Bangkok"),
-            )
-            await context.add_init_script(stealth_js)
-            page = await context.new_page()
-            try:
-                cdp = await context.new_cdp_session(page)
-                await cdp.send("Page.addScriptToEvaluateOnNewDocument", {"source": stealth_js})
-            except Exception:
-                pass
-
+            asyncio.create_task(self._live_stream_task(page))
             behavior = stealth.HumanBehavior(seed, viewport)
             deadline = time.time() + self.qi_max_minutes * 60
             phase = "open"
 
             try:
+                self.update_status("QUEUING", self.target_url)
                 await page.goto(self.target_url, timeout=60000, wait_until="domcontentloaded")
                 await self.send_log(f"🔗 เปิดหน้า event: {self.target_url}")
+                await self._try_human_verification(page, behavior)
                 await behavior.wander(page, moves=3)
 
                 while not self.success and time.time() < deadline:
-                    if await self.global_stopped() or not await self.is_running():
+                    if await self.global_stopped() or not await self.is_running() or await self.is_worker_stopped():
                         await self.send_log("⏹ STOP — ออกจาก Queue-it flow")
                         break
 
-                    # Highest priority: never get dropped by the inactivity modal.
-                    if await self._qi_click_text(page, behavior, self.qi_stillhere_texts):
-                        await self.send_log("🟢 ตอบ 'Still here? → Yes' อัตโนมัติ", "DEBUG")
-                        await behavior.think(0.2, 0.6)
+                    await self._check_screenshot_command(page)
+
+                    if await self._try_human_verification(page, behavior):
                         continue
 
-                    # Released onto the real purchase page?
-                    if await self._qi_on_purchase_page(page):
-                        if phase != "purchase":
-                            phase = "purchase"
-                            await self.send_log("🎯 ทะลุคิวแล้ว! เข้าหน้าซื้อบัตร — กำลังเลือกที่นั่ง", "SUCCESS")
-                        await self._qi_try_selector(page, behavior, self.qi_seat_selector)
-                        await behavior.think(0.3, 0.9)
-                        if await self._qi_try_selector(page, behavior, self.qi_addtocart_selector):
-                            await self.send_log("🛒 กดใส่ตะกร้า/ดำเนินการต่อแล้ว", "INFO")
-                            await behavior.think(1.0, 2.0)
-                            body = ""
+                    # Highest priority: never get dropped by the inactivity modal.
+                    if await self._qi_click_text(page, behavior, self.qi_stillhere_texts, wait_hidden=True):
+                        await self.send_log("🟢 ตอบ 'Still here? → Yes' อัตโนมัติ", "DEBUG")
+                        await behavior.think(0.5, 1.2)
+                        continue
+
+                    # Check for "ผ่านคิวแล้ว!" / "เลือกที่นั่ง" button
+                    if await self._qi_click_text(page, behavior, ["เลือกที่นั่ง", "select seats", "enter seats", "เข้าสู่การเลือกที่นั่ง"]):
+                        self.update_status("ADMITTED", page.url)
+                        await self.send_log("🎉 ผ่านคิวแล้ว! กำลังกดปุ่ม 'เลือกที่นั่ง' เพื่อไปยังแผนผัง...", "SUCCESS")
+                        await behavior.think(0.5, 1.2)
+                        if self.qi_manual_takeover:
+                            await self._run_manual_takeover_loop(page, proxy_str)
+                            break
+                        continue
+
+                    # Check for member code input page (e.g. pre-sale member verification)
+                    member_input = page.locator("input#member-code-input").first
+                    if await member_input.count() > 0 and await member_input.is_visible():
+                        self.update_status("ENTERING_MEMBER_CODE", page.url)
+                        if not self.membership_code:
+                            await self.send_log("⚠️ พบหน้าให้กรอกรหัสสมาชิก แต่ไม่ได้ตั้งค่า Membership Code ไว้ใน UI Setup!", "WARN")
+                            await asyncio.sleep(3)
+                        else:
+                            await self.send_log(f"🔑 พบหน้ากรอกรหัสสมาชิก กำลังกรอกรหัส: {self.membership_code}...", "INFO")
+                            
+                            # Clear input if any value is already present, then type human-like
+                            current_val = await member_input.input_value()
+                            if current_val != self.membership_code:
+                                await member_input.scroll_into_view_if_needed()
+                                box = await member_input.bounding_box()
+                                if box:
+                                    await behavior.click(page, box["x"] + box["width"]/2, box["y"] + box["height"]/2)
+                                else:
+                                    await member_input.click()
+                                await member_input.fill("")
+                                await behavior.type_text(page, self.membership_code, mistake_prob=0.03)
+                                await behavior.think(0.2, 0.6)
+                            
+                            # Click the "ตกลง" submit button
+                            submit_btn = page.locator("button.submit-btn, button:has-text('ตกลง')").first
+                            if await submit_btn.count() > 0 and await submit_btn.is_visible():
+                                await submit_btn.scroll_into_view_if_needed()
+                                box = await submit_btn.bounding_box()
+                                if box:
+                                    await behavior.click(page, box["x"] + box["width"]/2, box["y"] + box["height"]/2)
+                                else:
+                                    await submit_btn.click()
+                                await self.send_log("✅ กดปุ่มส่งรหัสสมาชิกสำเร็จ", "INFO")
+                                await behavior.think(0.5, 1.2)
+                        continue
+
+                    if await self._qi_click_text(page, behavior, self.qi_join_texts):
+                        self.update_status("JOINING_QUEUE", page.url)
+                        await self.send_log("🚶 ปุ่ม 'Join the Queue' โผล่แล้ว! กำลังกดปุ่มเข้าคิว...", "INFO")
+                        await behavior.think(0.5, 1.0)
+                        continue
+
+                    try:
+                        body_text = (await page.inner_text("body"))[:4000].lower()
+                        if "ยังไม่ถึงเวลาเปิดขาย" in body_text or "the event will begin at" in body_text or "รอเวลาเปิดขาย" in body_text:
+                            self.update_status("WAITING_SALE_START", page.url)
+                            await self.send_log("⏳ รอหน้า Pre-Queue (Countdown) - กำลังจอดรอจนกว่าปุ่มเข้าคิวจะขึ้น...", "INFO")
+                            await asyncio.sleep(5)
+                            continue
+                    except Exception:
+                        pass
+
+                    # Check for Checkout / Payment Page
+                    url_l = (page.url or "").lower()
+                    try:
+                        body_lower = (await page.inner_text("body"))[:4000].lower()
+                    except Exception:
+                        body_lower = ""
+
+                    is_payment_page = False
+                    if not any(k in url_l for k in ("/seats", "booking")):
+                        if any(k in url_l for k in ("checkout", "cart", "payment", "order", "2c2p")) or any(k in body_lower for k in (
+                            "checkout", "ชำระเงิน", "บัตรเครดิต", "payment",
+                            "ยืนยันการสั่งซื้อ", "order summary", "สรุปคำสั่งซื้อ",
+                        )):
+                            # Ensure we are not on the "Passed Queue" intermediate landing page
+                            if not any(k in body_lower for k in ("ผ่านคิวแล้ว", "admitted", "เลือกที่นั่ง", "select seat", "select seats")):
+                                if not await self._qi_on_purchase_page(page):
+                                    is_payment_page = True
+
+                    if is_payment_page:
+                        self.update_status("CHECKING_OUT", page.url)
+                        await self.send_log("💳 พบหน้าชำระเงิน/สรุปคำสั่งซื้อ — กำลังเลือกชำระเงินด้วย PromptPay...", "INFO")
+                        await self._qi_select_promptpay_payment(page, behavior)
+
+                        try:
+                            verify_result = await self.ai_recovery.verify_checkout(page)
+                            if verify_result:
+                                v_status = verify_result.get("status")
+                                if v_status == "action_required":
+                                    await self.send_log(
+                                        f"⚠️ AI ตรวจพบปัญหาในหน้า checkout: {verify_result.get('explanation', '')[:200]}",
+                                        "WARN",
+                                    )
+                                    await self.ai_recovery.attempt_recovery(
+                                        page, screenshot_dir="/app/tmp",
+                                        behavior=behavior, phase="checkout"
+                                    )
+                                    await behavior.think(0.5, 1.0)
+                                elif v_status == "human_intervention_required":
+                                    await self.send_log(
+                                        f"🚨 AI แจ้งว่าต้องการคนช่วย: {verify_result.get('explanation', '')[:200]}",
+                                        "WARN",
+                                    )
+                                else:
+                                    await self.send_log("✅ AI ยืนยันหน้า checkout ถูกต้อง", "INFO")
+                        except Exception as ve:
+                            await self.send_log(f"⚠️ AI verification ขัดข้อง (ไม่กระทบ flow): {ve}", "DEBUG")
+
+                        self.update_status("SUCCESS", page.url)
+                        await self._qi_notify_payment_ready(page, proxy_str)
+                        self.success = True
+                        if self.qi_stop_on_first:
+                            await self.set_global_stop()
+                        await self.send_log(f"⌛ คงเซสชันไว้ {self.qi_hold_seconds}s เพื่อให้จ่ายเงินต่อ...", "INFO")
+                        await asyncio.sleep(self.qi_hold_seconds)
+                        break
+
+                    # Check for Registration Page
+                    is_registration_page = False
+                    if not any(k in url_l for k in ("/seats", "booking")):
+                        if any(k in url_l for k in ("register", "registration")) or any(k in body_lower for k in ("ลงทะเบียน", "register", "กรอกรายละเอียด", "ชื่อ-นามสกุลบน")):
+                            if not await self._qi_on_purchase_page(page):
+                                is_registration_page = True
+
+                    if is_registration_page:
+                        if self.ticket_buyers:
+                            self.update_status("CHECKING_OUT", page.url)
+                            await self.send_log("📝 พบหน้าลงทะเบียน/กรอกรายละเอียด — กำลังกรอกข้อมูลผู้เข้าชม...", "INFO")
+                            await self._qi_fill_registration_names(page, behavior)
+                            await behavior.think(0.5, 1.0)
                             try:
-                                body = (await page.inner_text("body"))[:4000].lower()
+                                await self.ai_recovery.attempt_recovery(
+                                    page, screenshot_dir="/app/tmp",
+                                    behavior=behavior, phase="registration"
+                                )
                             except Exception:
                                 pass
-                            url_l = (page.url or "").lower()
-                            if any(k in body for k in (
-                                "checkout", "ชำระเงิน", "บัตรเครดิต", "payment",
-                                "ยืนยันการสั่งซื้อ", "order summary", "สรุปคำสั่งซื้อ",
-                            )) or any(k in url_l for k in ("checkout", "cart", "payment", "order")):
-                                await self._qi_notify_payment_ready(page, proxy_str)
-                                self.success = True
-                                if self.qi_stop_on_first:
-                                    await self.set_global_stop()
-                                await self.send_log(
-                                    f"⌛ คงเซสชันไว้ {self.qi_hold_seconds}s เพื่อให้จ่ายเงินต่อ...", "INFO"
-                                )
-                                await asyncio.sleep(self.qi_hold_seconds)
-                                break
                         continue
 
-                    # Still in the waiting funnel → try to join, else keep alive.
+                    # Check for Purchase / Seat Selection Page
+                    if await self._qi_on_purchase_page(page):
+                        if self.qi_manual_takeover:
+                            await self._run_manual_takeover_loop(page, proxy_str)
+                            break
+
+                        if phase != "purchase":
+                            phase = "purchase"
+                            self.update_status("SELECTING_SEAT", page.url)
+                            await self.send_log("🎯 ทะลุคิวแล้ว! เข้าหน้าซื้อบัตร — กำลังเลือกที่นั่ง", "SUCCESS")
+
+                            try:
+                                ai_plan = await self.ai_recovery.analyze_purchase_page(page)
+                                if ai_plan:
+                                    detected = ai_plan.get("detected_elements", {})
+                                    if detected:
+                                        await self.send_log(
+                                            f"🔍 AI Pre-scan: พบปุ่ม {detected.get('buttons', [])[:5]}, "
+                                            f"inputs {detected.get('inputs', [])[:3]}",
+                                            "INFO",
+                                        )
+                            except Exception as e:
+                                await self.send_log(f"⚠️ AI Pre-scan ขัดข้อง (ไม่กระทบ flow หลัก): {e}", "DEBUG")
+
+                            if self.ticket_count > 1:
+                                await self._qi_select_ticket_quantity(page, behavior)
+                                await behavior.think(0.3, 0.8)
+
+                        self.update_status("SELECTING_SEAT", page.url)
+                        cart_clicked = await self._qi_smart_seat_selection(page, behavior)
+
+                        if cart_clicked:
+                            self.update_status("ADDING_TO_CART", page.url)
+                            await self.send_log("🛒 กดใส่ตะกร้า/ดำเนินการต่อแล้ว", "INFO")
+                            await behavior.think(1.0, 2.0)
+                            
+                            try:
+                                body_after = (await page.inner_text("body"))[:4000].lower()
+                                if "ที่นั่งถูกล็อกโดย" in body_after or "seat locked by" in body_after or "ที่นั่งถูกล็อกโดยคนอื่นแล้ว" in body_after:
+                                    await self.send_log("💥 ที่นั่งถูกล็อกโดยผู้อื่น (โดนแย่ง) — กำลังเริ่มสแกนหาที่นั่งใหม่...", "WARN")
+                                    await asyncio.sleep(1.5)
+                                    continue
+                            except Exception:
+                                pass
+
+                            if self.ticket_buyers:
+                                await self._qi_fill_registration_names(page, behavior)
+                                await behavior.think(0.5, 1.2)
+                        continue
+
+                    try:
+                        login_btn = page.locator("button:has-text('เข้าสู่ระบบ'), button[type='submit']").filter(has_text="เข้าสู่ระบบ").first
+                        if await login_btn.count() > 0 and await login_btn.is_visible():
+                            if getattr(self, "_login_attempts", 0) < 3:
+                                self._login_attempts = getattr(self, "_login_attempts", 0) + 1
+                                await self.send_log(f"🔑 เริ่มกระบวนการล็อกอินเสมือนมนุษย์ (ครั้งที่ {self._login_attempts})...", "INFO")
+                                try:
+                                    profile = self.profiles[0] if self.profiles else {}
+                                    email = profile.get("email") or "bot@example.com"
+                                    pwd = profile.get("password") or "password123"
+                                    
+                                    email_input = page.locator("input[type='email'], input[name='email'], input[name='username'], input#email").first
+                                    pwd_input = page.locator("input[type='password'], input[name='password'], input#password").first
+                                    
+                                    if behavior:
+                                        current_email = await email_input.input_value()
+                                        if current_email != email:
+                                            await email_input.scroll_into_view_if_needed()
+                                            box = await email_input.bounding_box()
+                                            if box:
+                                                await behavior.click(page, box["x"] + box["width"]/2, box["y"] + box["height"]/2)
+                                            else:
+                                                await email_input.click()
+                                            await email_input.fill("")
+                                            await behavior.type_text(page, email, mistake_prob=0.06)
+                                            await behavior.think(0.2, 0.5)
+                                            
+                                            await pwd_input.scroll_into_view_if_needed()
+                                            box = await pwd_input.bounding_box()
+                                            if box:
+                                                await behavior.click(page, box["x"] + box["width"]/2, box["y"] + box["height"]/2)
+                                            else:
+                                                await pwd_input.click()
+                                            await pwd_input.fill("")
+                                            await behavior.type_text(page, pwd, mistake_prob=0.03)
+                                            await behavior.think(0.2, 0.6)
+                                        
+                                        captcha_box = page.locator("#login-captcha, .recaptcha-checkbox-border, iframe[src*='recaptcha']").first
+                                        if await captcha_box.count() > 0 and await captcha_box.is_visible():
+                                            await captcha_box.scroll_into_view_if_needed()
+                                            box = await captcha_box.bounding_box()
+                                            if box:
+                                                await behavior.click(page, box["x"] + box["width"]/2, box["y"] + box["height"]/2)
+                                                await behavior.think(0.4, 0.8)
+                                        
+                                        await behavior.scroll(page, 400)
+                                        await behavior.think(0.3, 0.7)
+                                        
+                                        await login_btn.scroll_into_view_if_needed()
+                                        box = await login_btn.bounding_box()
+                                        if box:
+                                            await behavior.click(page, box["x"] + box["width"]/2, box["y"] + box["height"]/2)
+                                        else:
+                                            await login_btn.click()
+                                    else:
+                                        await email_input.fill(email)
+                                        await pwd_input.fill(pwd)
+                                        captcha_box = page.locator("#login-captcha, .recaptcha-checkbox-border").first
+                                        if await captcha_box.count() > 0 and await captcha_box.is_visible():
+                                            await captcha_box.check()
+                                        await login_btn.click()
+                                        
+                                    await self.send_log("✅ กดล็อกอินแล้ว รอดูผล...", "INFO")
+                                    await asyncio.sleep(2.5)
+                                except Exception as e:
+                                    await self.send_log(f"⚠️ ข้อผิดพลาดล็อกอิน: {e}", "WARN")
+                            else:
+                                if not getattr(self, "_login_failed_alerted", False):
+                                    await self.send_log("❌ ล็อกอินไม่สำเร็จเกิน 3 ครั้ง กำลังให้ AI เบื้องหลังช่วยแก้ปัญหา...", "WARN")
+                                    self._login_failed_alerted = True
+                                    
+                                try:
+                                    recovered = await self.ai_recovery.attempt_recovery(
+                                        page, screenshot_dir="/app/tmp",
+                                        behavior=behavior, phase="login"
+                                    )
+                                    if recovered:
+                                        await self.send_log("🤖 AI เบื้องหลังวิเคราะห์และช่วยดำเนินการล็อกอินแล้ว", "SUCCESS")
+                                except Exception:
+                                    pass
+                                continue
+                    except Exception:
+                        pass
+
                     if await self._qi_in_queue(page):
+                        try:
+                            captcha_modal = page.locator("#final-captcha-modal").first
+                            if await captcha_modal.count() > 0:
+                                class_attr = await captcha_modal.get_attribute("class") or ""
+                                if "hidden" not in class_attr:
+                                    await self.send_log("🚨 พบ CAPTCHA ด่านสุดท้าย (ก่อนเข้าหน้าซื้อตั๋ว) กำลังดำเนินการแก้ไข...", "WARN")
+                                    try:
+                                        solved = await browser.challenge.solve_final_captcha(
+                                            page, behavior, self.send_log
+                                        )
+                                        if solved:
+                                            await self.send_log("🤖 แก้ไข CAPTCHA ด่านสุดท้ายสำเร็จ!", "SUCCESS")
+                                            await behavior.think(1.0, 2.0)
+                                        else:
+                                            await self.send_log("⚠️ แก้ไข CAPTCHA ด่านสุดท้ายไม่สำเร็จ กำลังลองใหม่...", "WARN")
+                                    except Exception as ai_err:
+                                        await self.send_log(f"⚠️ แก้ไข CAPTCHA ด่านสุดท้ายขัดข้อง: {ai_err}", "DEBUG")
+                                    continue
+                        except Exception:
+                            pass
+
+                        if await self._qi_click_text(page, behavior, ["เลือกที่นั่ง", "select seats", "enter seats", "เข้าสู่การเลือกที่นั่ง"]):
+                            self.update_status("ADMITTED", page.url)
+                            await self.send_log("🎉 ผ่านคิวแล้ว! กำลังกดปุ่ม 'เลือกที่นั่ง' เพื่อไปยังแผนผัง...", "SUCCESS")
+                            await behavior.think(0.5, 1.0)
+                            continue
+
                         if await self._qi_click_text(page, behavior, self.qi_join_texts):
                             if phase != "queue":
                                 phase = "queue"
                                 await self.send_log("⏩ กด 'Join the Queue' แล้ว — กำลังรอคิว", "INFO")
                         elif phase == "queue":
                             await behavior.wander(page, moves=1)
+                            if random.random() > 0.3:
+                                scroll_y = random.randint(100, 600)
+                                await page.mouse.wheel(0, scroll_y)
+                                await asyncio.sleep(random.uniform(0.2, 0.6))
+                                await page.mouse.wheel(0, -scroll_y)
                         await asyncio.sleep(random.uniform(0.8, 1.8))
                         continue
 
-                    # Pre-queue: event page or countdown — try the book button.
                     if await self._qi_try_selector(page, behavior, self.qi_book_selector):
                         await self.send_log("📨 กดปุ่มจอง/ซื้อบัตรแล้ว", "INFO")
-                        # Small per-worker jitter so the fleet doesn't join in lockstep.
                         await asyncio.sleep(random.uniform(0.1, 1.0))
                         await behavior.think(0.4, 1.0)
                         continue
 
-                    # Countdown not finished / nothing actionable → gentle reload.
+                    try:
+                        # Check if final captcha modal is visible first
+                        captcha_modal = page.locator("#final-captcha-modal").first
+                        if await captcha_modal.count() > 0 and "hidden" not in (await captcha_modal.get_attribute("class") or ""):
+                            await self.send_log("🚨 พบ CAPTCHA ด่านสุดท้าย (ก่อนเข้าหน้าซื้อตั๋ว) กำลังดำเนินการแก้ไข...", "WARN")
+                            solved = await browser.challenge.solve_final_captcha(page, behavior, self.send_log)
+                            if solved:
+                                await self.send_log("🤖 แก้ไข CAPTCHA ด่านสุดท้ายสำเร็จ!", "SUCCESS")
+                                await behavior.think(1.0, 2.0)
+                            else:
+                                await self.send_log("⚠️ แก้ไข CAPTCHA ด่านสุดท้ายไม่สำเร็จ กำลังลองใหม่...", "WARN")
+                            continue
+
+                        _ai_phase = "queue" if await self._qi_in_queue(page) else "captcha"
+                        recovered = await self.ai_recovery.attempt_recovery(
+                            page, screenshot_dir="/app/tmp", phase=_ai_phase
+                        )
+                        if recovered:
+                            await self.send_log("🤖 AI กู้คืนสถานะหน้าจอและดำเนินการอัตโนมัติสำเร็จ", "SUCCESS")
+                            await asyncio.sleep(1.0)
+                            continue
+                    except Exception as ai_err:
+                        await self.send_log(f"⚠️ ระบบ AI Recovery ขัดข้อง: {ai_err}", "DEBUG")
+
                     await behavior.wander(page, moves=1)
-                    await asyncio.sleep(random.uniform(1.5, 3.0))
+                    sleep_interval = max(10.0, self.refresh_interval)
+                    sleep_jittered = sleep_interval * random.uniform(0.85, 1.15)
+                    await asyncio.sleep(sleep_jittered)
                     try:
                         await page.reload(timeout=30000, wait_until="domcontentloaded")
+                        await self._try_human_verification(page, behavior)
                     except Exception:
                         pass
 
@@ -871,36 +903,62 @@ class TTMWorker:
                 await self.send_log(f"❌ Queue-it flow error: {e}", "ERROR")
             finally:
                 try:
+                    control_task.cancel()
+                    await control_task
+                except Exception:
+                    pass
+                try:
                     await context.close()
-                    await browser.close()
+                    await browser_instance.close()
                 except Exception:
                     pass
 
     # ── Main run loop ──────────────────────────────────────────────────────────
 
     async def run(self):
-        self.register_worker()
-        try:
-            await self.send_log("Worker พร้อมแล้ว ⏳ — รอคำสั่ง START จาก Dashboard")
+        while True:
+            self.success = False
+            self.status = "STANDBY"
+            self.current_url = "N/A"
+            self.register_worker()
+            heartbeat_task = asyncio.create_task(self._heartbeat_loop())
+            try:
+                await self.send_log("Worker พร้อมแล้ว ⏳ — รอคำสั่ง START จาก Dashboard")
 
-            # ── Standby: wait for START ───────────────────────────────────────
-            while not await self.is_running():
-                self.heartbeat()
-                await asyncio.sleep(2)
+                while not await self.is_running() or await self.is_worker_stopped():
+                    if await self.is_worker_stopped():
+                        self.update_status("STOPPED")
+                    else:
+                        self.update_status("STANDBY")
+                    await asyncio.sleep(2)
 
-            self._refresh_config()
+                self._refresh_config()
+                self.update_status("RUNNING", self.target_url)
 
-            # Browser-only bot. "general" = generic button-click automation;
-            # anything else (incl. legacy "ttm") → real Queue-it funnel.
-            if self.bot_mode == "general":
-                await self.run_general_mode()
-            else:
+                try:
+                    if r.get("ttm:global_stop") == "1":
+                        r.delete("ttm:global_stop")
+                        await self.send_log("🔄 ล้างสถานะ global_stop สำหรับรอบการทำงานใหม่", "INFO")
+                except Exception:
+                    pass
+
+                if self.bot_mode == "defense_demo":
+                    await self.send_log("🛡️ โหมด Defense Demo — รวมติ๊ก Akamai + ห้องรอ sandbox")
                 await self.run_queueit_mode()
 
-        finally:
-            self.unregister_worker()
+            except Exception as e:
+                self.update_status("FAILED")
+                await self.send_log(f"❌ ระบบเกิดข้อผิดพลาดในการรัน: {e}", "ERROR")
+            finally:
+                heartbeat_task.cancel()
+                try:
+                    await heartbeat_task
+                except asyncio.CancelledError:
+                    pass
+                self.unregister_worker()
+            
+            await asyncio.sleep(3)
 
 
 if __name__ == "__main__":
     asyncio.run(TTMWorker().run())
-

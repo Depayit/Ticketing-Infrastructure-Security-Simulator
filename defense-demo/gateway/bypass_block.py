@@ -13,6 +13,7 @@ For GraphQL, the main.py already gates it with GRAPHQL_ENABLED.
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Callable
 
@@ -20,7 +21,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from shared.config import BOT_BYPASS_BLOCK
+from shared.redis_client import r
 
 log = logging.getLogger("bypass_block")
 
@@ -52,11 +53,14 @@ class BotBypassBlockMiddleware(BaseHTTPMiddleware):
         # For the public funnel and sensor endpoints we are intentionally permissive
         # during bot development. Real blocking happens deeper (fraud-engine rules).
         if path.startswith(("/api/funnel", "/api/sensor", "/api/telemetry", "/api/challenge")):
-            if BOT_BYPASS_BLOCK:
+            toggles_raw = r.get("defense:config:toggles")
+            toggles = json.loads(toggles_raw) if toggles_raw else {"bot_bypass": True}
+            
+            if toggles.get("bot_bypass", True):
                 # Let it through; the seat-service + fraud-engine will still score it.
                 return await call_next(request)
-            # If bypass is off, we could add extra checks here in the future.
-            return await call_next(request)
+            else:
+                return JSONResponse(BLOCK_RESPONSE, status_code=403)
 
         # GraphQL is handled explicitly in main.py (returns 403 when disabled).
         if path == "/graphql/v2":

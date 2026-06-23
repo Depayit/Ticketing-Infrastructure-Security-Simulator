@@ -11,9 +11,20 @@
     return token;
   }
 
+  function requireMemberCode() {
+    const code = localStorage.getItem("defense_member_code");
+    if (!code) {
+      location.href = "/member-code";
+      return null;
+    }
+    return code;
+  }
+
   function requireCart() {
     const token = requireQueueToken();
     if (!token) return null;
+    const code = requireMemberCode();
+    if (!code) return null;
     const cartId = localStorage.getItem("defense_cart_id");
     if (!cartId) {
       alert("กรุณาเลือกที่นั่งก่อนชำระเงิน");
@@ -53,6 +64,7 @@
 
   global.TTMFunnel = {
     requireQueueToken,
+    requireMemberCode,
     requireCart,
     purchaseDeadlineMs,
     startPurchaseTimer,

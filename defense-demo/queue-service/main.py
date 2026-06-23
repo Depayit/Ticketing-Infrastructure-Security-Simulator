@@ -1,4 +1,4 @@
-﻿import hashlib
+import hashlib
 import json
 import secrets
 import sys
@@ -38,14 +38,30 @@ def health():
 def queue_status(req: QueueStatusRequest, request: Request):
     ip = req.ip or (request.client.host if request.client else "unknown")
 
-    if not try_admit():
-        log_event("ip", "admission_denied", req.session_id, ip, blocked=True)
+    sale_start_raw = r.get("defense:config:sale_start")
+    sale_start = float(sale_start_raw) if sale_start_raw else 0.0
+    
+    if sale_start > time.time():
         return {
-            "status": "waiting",
+            "status": "pre_queue",
+            "startTime": sale_start,
             "token": "",
             "captchaSitekey": "",
-            "queuePosition": r.incr("defense:queue:waiting") % 1000 + 1,
+            "queuePosition": 0,
         }
+
+    toggles_raw = r.get("defense:config:toggles")
+    toggles = json.loads(toggles_raw) if toggles_raw else {"queue": True}
+
+    if toggles.get("queue", True):
+        if not try_admit():
+            log_event("ip", "admission_denied", req.session_id, ip, blocked=True)
+            return {
+                "status": "waiting",
+                "token": "",
+                "captchaSitekey": "",
+                "queuePosition": r.incr("defense:queue:waiting") % 1000 + 1,
+            }
 
     token = secrets.token_urlsafe(32)
     issued_at = time.time()

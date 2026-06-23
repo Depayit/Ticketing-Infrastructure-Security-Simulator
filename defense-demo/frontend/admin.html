@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="th">
 <head>
   <meta charset="UTF-8" />
@@ -60,6 +60,29 @@
     }
     .btn-clear:hover { filter: brightness(1.08); }
     .btn-clear:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-reset-seats {
+      padding: 10px 18px;
+      border-radius: 8px;
+      border: none;
+      background: #f59e0b;
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .btn-reset-seats:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-config {
+      padding: 10px 18px;
+      border-radius: 8px;
+      border: none;
+      background: var(--ttm-blue);
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .btn-config:hover { filter: brightness(1.08); }
+    .admin-actions { display: flex; gap: 10px; flex-wrap: wrap; }
     .table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border-light); }
     table { border-collapse: collapse; width: 100%; font-size: 13px; }
     th, td { border-bottom: 1px solid #e5e7eb; padding: 10px 12px; text-align: left; }
@@ -72,6 +95,7 @@
     tr.layer-queue td:first-child { border-left: 4px solid #3b82f6; }
     tr.layer-akamai td:first-child { border-left: 4px solid #8b5cf6; }
     tr.layer-edge td:first-child { border-left: 4px solid #06b6d4; }
+    tr.layer-seat td:first-child { border-left: 4px solid #f97316; }
     .badge {
       display: inline-block;
       padding: 4px 10px;
@@ -83,6 +107,18 @@
     .badge-fail { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
     .action-fail { color: #991b1b; font-weight: 600; }
     .empty-msg { text-align: center; padding: 48px; color: var(--text-muted); }
+    .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+    .btn-page { padding: 6px 12px; border: 1px solid var(--border-light); border-radius: 6px; background: #fff; cursor: pointer; font-size: 13px; font-weight: 600; }
+    .btn-page:hover { background: #f3f4f6; }
+    .btn-page.active { background: var(--ttm-blue); color: #fff; border-color: var(--ttm-blue); }
+    .toggle-wrapper { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb; }
+    .toggle-wrapper span { font-size: 13px; font-weight: 600; color: #374151; }
+    .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
+    .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+    input:checked + .slider { background-color: #10b981; }
+    input:checked + .slider:before { transform: translateX(20px); }
     .toast {
       position: fixed;
       bottom: 24px;
@@ -132,16 +168,53 @@
           <div class="value" id="stat-blocked">0</div>
         </div>
       </div>
-      <button type="button" class="btn-clear" id="btn-clear-all">ล้างข้อมูลทั้งหมด</button>
+      <div class="admin-actions">
+        <button type="button" class="btn-config" id="btn-config">⚙️ ตั้งค่าอีเวนต์</button>
+        <button type="button" class="btn-reset-seats" id="btn-reset-seats">🔄 รีเซ็ตที่นั่ง & Sessions</button>
+        <button type="button" class="btn-clear" id="btn-clear-all">🗑️ ล้างข้อมูลทั้งหมด</button>
+        <button type="button" class="btn-config" id="btn-set-prequeue" style="background:#8b5cf6;">⏳ ตั้งเวลา Pre-Queue (1 นาที)</button>
+      </div>
+    </div>
+
+    <!-- Defense System Toggles -->
+    <div style="background:#fff; border:1px solid var(--border-light); border-radius:12px; padding:16px; margin-bottom:20px;">
+      <h3 style="margin-top:0; margin-bottom:12px; font-size:14px; color:var(--text-main);">🎛️ Defense Systems Control</h3>
+      <div id="toggles-grid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px;">
+        <div class="empty-msg" style="padding:10px;">กำลังโหลด...</div>
+      </div>
     </div>
 
     <div class="filter-tabs" style="margin-bottom:16px;">
       <button type="button" class="active" data-filter="all">ทั้งหมด</button>
       <button type="button" class="tab-pass" data-filter="pass">ผ่าน</button>
       <button type="button" class="tab-fail" data-filter="fail">ไม่ผ่าน</button>
+      <button type="button" data-filter="layer-edge">EDGE</button>
     </div>
 
-    <div class="table-wrap">
+    <!-- Event Config Modal -->
+    <div id="config-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:999; align-items:center; justify-content:center;">
+      <div style="background:#fff; width:600px; max-width:90%; border-radius:12px; padding:24px; max-height:90vh; overflow-y:auto;">
+        <h2 style="margin-top:0; margin-bottom:16px;">ตั้งค่าอีเวนต์ (Event Config)</h2>
+        <div style="margin-bottom:12px;">
+          <label style="display:block; font-weight:bold; margin-bottom:4px;">Event Name</label>
+          <input type="text" id="cfg-event-name" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="display:block; font-weight:bold; margin-bottom:4px;">จำนวนที่ซื้อได้สูงสุดต่อ 1 บัญชี (Max Tickets)</label>
+          <input type="number" id="cfg-max-tickets" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
+        </div>
+        <div style="margin-bottom:16px;">
+          <label style="display:block; font-weight:bold; margin-bottom:4px;">ข้อมูลโซนและราคา (JSON)</label>
+          <textarea id="cfg-zones-json" style="width:100%; height:180px; padding:8px; border:1px solid #ccc; border-radius:4px; font-family:monospace;"></textarea>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:12px;">
+          <button type="button" id="btn-close-config" style="padding:8px 16px; border:none; background:#ccc; border-radius:6px; cursor:pointer;">ยกเลิก</button>
+          <button type="button" id="btn-save-config" style="padding:8px 16px; border:none; background:var(--ttm-blue); color:#fff; border-radius:6px; cursor:pointer; font-weight:bold;">บันทึก</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="table-wrap" style="max-height: 800px; overflow-y: auto;">
       <table>
         <thead>
           <tr>
@@ -158,6 +231,7 @@
         </tbody>
       </table>
     </div>
+    <div id="pagination" class="pagination"></div>
   </div>
 
   <footer class="ttm-footer"></footer>
@@ -169,6 +243,8 @@
 
     let currentFilter = "all";
     let allEvents = [];
+    let currentPage = 1;
+    const itemsPerPage = 100;
 
     function showToast(msg) {
       const el = document.getElementById("toast");
@@ -185,13 +261,20 @@
 
     function renderRows(events) {
       const filtered = filterEvents(events);
+      const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1;
+      if (currentPage > totalPages) currentPage = totalPages;
+
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const paginated = filtered.slice(startIndex, startIndex + itemsPerPage);
+
       const tbody = document.getElementById("rows");
-      if (!filtered.length) {
+      if (!paginated.length) {
         const label = currentFilter === "pass" ? "ผ่าน" : currentFilter === "fail" ? "ไม่ผ่าน" : "";
         tbody.innerHTML = `<tr><td colspan="6" class="empty-msg">ไม่มีเหตุการณ์${label ? " (" + label + ")" : ""}</td></tr>`;
+        document.getElementById("pagination").innerHTML = "";
         return;
       }
-      tbody.innerHTML = filtered.map((e) => {
+      tbody.innerHTML = paginated.map((e) => {
         const layer = (e.layer || "").replace("3ds", "3ds");
         const pass = !e.blocked;
         const rowClass = pass ? "row-pass" : "row-fail";
@@ -207,7 +290,28 @@
           <td><code>${JSON.stringify(e.detail || {}).slice(0, 120)}</code></td>
         </tr>`;
       }).join("");
+
+      renderPagination(totalPages);
     }
+
+    function renderPagination(totalPages) {
+      const container = document.getElementById("pagination");
+      if (totalPages <= 1) {
+        container.innerHTML = "";
+        return;
+      }
+      let html = "";
+      for (let i = 1; i <= totalPages; i++) {
+        const btnClass = i === currentPage ? "btn-page active" : "btn-page";
+        html += `<button type="button" class="${btnClass}" onclick="setPage(${i})">${i}</button>`;
+      }
+      container.innerHTML = html;
+    }
+
+    window.setPage = function(p) {
+      currentPage = p;
+      renderRows(allEvents);
+    };
 
     function updateStats(stats) {
       document.getElementById("stat-total").textContent = stats.total ?? 0;
@@ -217,7 +321,7 @@
 
     async function refresh() {
       try {
-        const res = await fetch("/admin/api/events?limit=200");
+        const res = await fetch("/admin/api/events?limit=1000");
         const data = await res.json();
         allEvents = data.events || [];
         updateStats(data.stats || { total: 0, passed: 0, blocked: 0 });
@@ -232,8 +336,62 @@
         document.querySelectorAll(".filter-tabs button").forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
         currentFilter = btn.dataset.filter;
+        currentPage = 1;
         renderRows(allEvents);
       });
+    });
+
+    let currentEventConfig = {};
+    const configModal = document.getElementById("config-modal");
+    document.getElementById("btn-config").addEventListener("click", async () => {
+      try {
+        const res = await fetch("/api/event-config");
+        if (res.ok) {
+          currentEventConfig = await res.json();
+          document.getElementById("cfg-event-name").value = currentEventConfig.eventName || "";
+          document.getElementById("cfg-max-tickets").value = currentEventConfig.maxTicketsPerAccount || 4;
+          document.getElementById("cfg-zones-json").value = JSON.stringify(currentEventConfig.zones || [], null, 2);
+          configModal.style.display = "flex";
+        } else {
+          showToast("ไม่สามารถโหลด Config ได้", "error");
+        }
+      } catch (err) {
+        showToast("Error loading config", "error");
+      }
+    });
+    
+    document.getElementById("btn-close-config").addEventListener("click", () => {
+      configModal.style.display = "none";
+    });
+
+    document.getElementById("btn-save-config").addEventListener("click", async () => {
+      try {
+        const eventName = document.getElementById("cfg-event-name").value;
+        const maxTickets = parseInt(document.getElementById("cfg-max-tickets").value, 10);
+        const zones = JSON.parse(document.getElementById("cfg-zones-json").value);
+        
+        const payload = {
+          ...currentEventConfig,
+          eventName,
+          maxTicketsPerAccount: maxTickets,
+          zones
+        };
+
+        const res = await fetch("/api/event-config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        
+        if (res.ok) {
+          showToast("บันทึกการตั้งค่าแล้ว", "success");
+          configModal.style.display = "none";
+        } else {
+          showToast("บันทึกไม่สำเร็จ", "error");
+        }
+      } catch (e) {
+        showToast("รูปแบบ JSON ไม่ถูกต้อง หรือมีข้อผิดพลาด", "error");
+      }
     });
 
     document.getElementById("btn-clear-all").addEventListener("click", async () => {
@@ -256,6 +414,101 @@
       }
     });
 
+    document.getElementById("btn-reset-seats").addEventListener("click", async () => {
+      if (!confirm("รีเซ็ตที่นั่ง & Sessions?\n\nล้าง seats, carts, sessions, telemetry, bans\n(เก็บ audit log ไว้)")) return;
+      const btn = document.getElementById("btn-reset-seats");
+      btn.disabled = true;
+      try {
+        const res = await fetch("/admin/api/reset-seats", { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "reset failed");
+        showToast("รีเซ็ตที่นั่งแล้ว (" + (data.deleted_keys || 0) + " keys) — ที่นั่งทั้งหมดว่างแล้ว");
+        await refresh();
+      } catch (e) {
+        showToast("รีเซ็ตไม่สำเร็จ: " + (e.message || e));
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    const TOGGLE_LABELS = {
+      waf: "🌍 Edge / WAF",
+      akamai: "🛡️ Akamai Sensor",
+      bot_bypass: "🚧 Bot Bypass Guard",
+      graphql: "🔌 GraphQL API",
+      queue: "🚦 Queue System",
+      three_ds: "💳 3DS Payment",
+      bot_simulation: "🤖 Traffic Simulation (คนแห่ซื้อ)"
+    };
+    
+    let currentToggles = {};
+
+    async function loadToggles() {
+      try {
+        const res = await fetch("/api/defense-toggles");
+        if (res.ok) {
+          currentToggles = await res.json();
+          renderToggles();
+        }
+      } catch (e) {
+        console.warn("Failed to load toggles");
+      }
+    }
+
+    async function saveToggles() {
+      try {
+        const res = await fetch("/api/defense-toggles", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(currentToggles)
+        });
+        if (res.ok) showToast("อัปเดตระบบป้องกันแล้ว");
+      } catch (e) {
+        showToast("อัปเดตระบบป้องกันไม่สำเร็จ");
+      }
+    }
+
+    function renderToggles() {
+      const grid = document.getElementById("toggles-grid");
+      grid.innerHTML = Object.keys(TOGGLE_LABELS).map(key => `
+        <div class="toggle-wrapper">
+          <span>${TOGGLE_LABELS[key]}</span>
+          <label class="switch">
+            <input type="checkbox" onchange="handleToggle('${key}', this.checked)" ${currentToggles[key] ? "checked" : ""}>
+            <span class="slider"></span>
+          </label>
+        </div>
+      `).join("");
+    }
+
+    window.handleToggle = function(key, val) {
+      if (key === "bot_simulation") {
+        fetch("/admin/api/set-simulation", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({enabled: val})
+        }).then(() => showToast("เปิด/ปิดระบบจำลองคนแห่ซื้อแล้ว"));
+        currentToggles[key] = val;
+        return;
+      }
+      currentToggles[key] = val;
+      saveToggles();
+    };
+    
+    document.getElementById("btn-set-prequeue").addEventListener("click", async () => {
+      try {
+        const res = await fetch("/admin/api/set-sale-start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ delay_seconds: 60 })
+        });
+        if (res.ok) showToast("ตั้งเวลาเปิดขายล่วงหน้า 1 นาทีแล้ว (Pre-Queue)");
+      } catch (e) {
+        showToast("ตั้งเวลาไม่สำเร็จ: " + e.message);
+      }
+    });
+
+    loadToggles();
     refresh();
     setInterval(refresh, 2000);
   </script>

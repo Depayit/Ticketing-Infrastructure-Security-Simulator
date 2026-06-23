@@ -1,15 +1,12 @@
-﻿{
+{
     "event_id":  "ttm-bkk-blackpink-world-tour-2026",
     "telegram_token":  "YOUR_TELEGRAM_BOT_TOKEN_HERE",
     "telegram_chat_id":  "YOUR_CHAT_ID_HERE",
-    "captcha_key":  "YOUR_2CAPTCHA_OR_CAPMONSTER_KEY_HERE",
+    "gemini_api_key": "AIzaSyD_PnXjcRMGdAfgiunVu8oo_x49-X2T4yA",
     "redis_url":  "redis://redis:6379/0",
     "proxy_rotator_url":  "http://proxy-rotator:8080",
     "proxies_per_worker":  5,
-    "proxies":  [
-                    "http://user1:pass1@th-residential-proxy1:8000",
-                    "http://user-session-{session}:pass@th-residential-gateway:8000"
-                ],
+    "proxies":  [],
     "profiles":  [
                      {
                          "fullname":  "ชื่อ1 นามสกุล1",
@@ -34,6 +31,8 @@
                                   }
                      }
                  ],
+    "ticket_count": 2,
+    "ticket_buyers": ["ชื่อ1 นามสกุล1", "ชื่อ2 นามสกุล2"],
     "ticket_priorities":  [
                               "VIP",
                               "GA",
@@ -43,8 +42,20 @@
     "target_url":  "https://www.thaiticketmajor.com/concert/your-event-here",
     "queueit":  {
                     "headless":  true,
+                    "manual_takeover": false,
                     "hold_seconds":  600,
                     "max_minutes":  120,
-                    "stop_on_first":  true
-                }
+                    "stop_on_first":  true,
+                    "show_date_preference": "2569-12-03",
+                    "show_dates": [
+                        "วันพฤหัสบดีที่ 3 ธันวาคม 2569",
+                        "วันเสาร์ที่ 5 ธันวาคม 2569",
+                        "วันอาทิตย์ที่ 6 ธันวาคม 2569"
+                    ],
+                    "seat_color_priorities": [],
+                    "zone_name_priorities": [],
+                    "auto_scroll_for_buttons": true,
+                    "max_scroll_search_px": 3000
+                },
+    "membership_code": ""
 }

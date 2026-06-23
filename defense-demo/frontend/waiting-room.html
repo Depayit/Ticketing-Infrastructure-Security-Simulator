@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="th">
 <head>
   <meta charset="UTF-8" />
@@ -44,6 +44,20 @@
           <div class="form-group">
             <label for="login-password">รหัสผ่าน</label>
             <input id="login-password" type="password" placeholder="••••••••" required autocomplete="current-password" />
+          </div>
+          <div class="recaptcha-widget">
+            <div class="recaptcha-checkbox-container">
+              <input type="checkbox" id="login-captcha" required />
+              <label for="login-captcha">ฉันไม่ใช่โปรแกรมอัตโนมัติ (CAPTCHA)</label>
+            </div>
+            <div class="recaptcha-logo-container">
+              <img src="https://www.gstatic.com/recaptcha/api2/logo_48.png" alt="reCAPTCHA" class="recaptcha-logo" />
+              <span class="recaptcha-text">reCAPTCHA</span>
+              <div class="recaptcha-links">
+                <a href="https://policies.google.com/privacy" target="_blank">Privacy</a> - 
+                <a href="https://policies.google.com/terms" target="_blank">Terms</a>
+              </div>
+            </div>
           </div>
           <button type="submit" class="ttm-btn">เข้าสู่ระบบ</button>
         </form>
@@ -121,6 +135,74 @@
       <h2>Still here?</h2>
       <p>Please confirm you’re still waiting. This won’t affect your place in line.</p>
       <button id="btn-activity-confirm" class="ttm-btn">Yes, I'm here</button>
+    </div>
+  </div>
+
+  <div id="final-captcha-modal" class="modal-backdrop hidden">
+    <div class="captcha-modal">
+      <div class="captcha-header">
+        <div class="captcha-header-left">
+          <span class="captcha-header-logo-badge">TTM</span>
+          <span class="captcha-header-title">ตรวจสอบความปลอดภัย (Security Check)</span>
+        </div>
+        <div class="captcha-header-right">
+          <span class="captcha-secure-badge">🛡️ SECURED</span>
+        </div>
+      </div>
+      
+      <!-- Type 1: Quiz -->
+      <div id="captcha-quiz" class="captcha-type-container hidden">
+        <h3 class="captcha-quiz-question" id="quiz-question-text"></h3>
+        <div class="quiz-options" id="quiz-options-container"></div>
+      </div>
+
+      <!-- Type 2: Slider -->
+      <div id="captcha-slider" class="captcha-type-container hidden">
+        <div class="captcha-icon">🛡️</div>
+        <h3>Verify You Are Human</h3>
+        <p>Slide the puzzle piece to complete the image.</p>
+        <div class="slider-puzzle-area">
+          <div class="slider-bg" id="slider-bg"></div>
+          <div class="slider-piece" id="slider-piece"></div>
+        </div>
+        <div class="slider-track-container">
+          <input type="range" min="0" max="100" value="0" class="slider-input" id="slider-input">
+        </div>
+        <button id="btn-verify-slider" class="ttm-btn">Verify</button>
+      </div>
+
+      <!-- Type 3: Color Match -->
+      <div id="captcha-color" class="captcha-type-container hidden">
+        <h3>เพื่อความปลอดภัย กรุณาคลิกที่สีที่ตรงกับกล่องด้านบน</h3>
+        <p>For security purposes, please click on the matching color.</p>
+        <div class="color-target-box" id="color-target"></div>
+        <div class="color-grid" id="color-grid"></div>
+        <button id="btn-verify-color" class="ttm-btn disabled" disabled>Processing...</button>
+      </div>
+
+      <!-- Type 4: Image Sort (Fan) -->
+      <div id="captcha-sort-fan" class="captcha-type-container hidden">
+        <h3>เพื่อความปลอดภัย กรุณาเรียงภาพให้ถูกต้อง</h3>
+        <p>ลากและวางชิ้นส่วนภาพจากบนลงล่างให้เป็นภาพที่สมบูรณ์</p>
+        <div class="sortable-list" id="sortable-fan"></div>
+        <button id="btn-verify-fan" class="ttm-btn">ยืนยัน / Verify</button>
+      </div>
+
+      <!-- Type 5: Image Sort (Lyric) -->
+      <div id="captcha-sort-lyric" class="captcha-type-container hidden">
+        <h3>เพื่อความปลอดภัย กรุณาเรียงภาพให้ถูกต้อง</h3>
+        <p>ลากและวางชิ้นส่วนภาพจากบนลงล่างให้เป็นภาพที่สมบูรณ์</p>
+        <div class="sortable-list" id="sortable-lyric"></div>
+        <button id="btn-verify-lyric" class="ttm-btn">ยืนยัน / Verify</button>
+      </div>
+
+      <!-- Timer & Footer -->
+      <div class="captcha-timer-area" id="captcha-timer-area">
+        <div id="captcha-countdown">00:00:60</div>
+      </div>
+      <div class="captcha-footer-red">
+        If you leave or answer incorrectly, you'll have to queue up again.
+      </div>
     </div>
   </div>
 

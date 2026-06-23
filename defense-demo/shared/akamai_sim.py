@@ -89,11 +89,10 @@ def compute_bot_score(signals: Dict[str, Any]) -> int:
 
     return max(0, min(100, score))
 
-
-def format_abck(session_id: str, bot_score: int, status: int = -1) -> str:
+def format_abck(status: int, session_id: str, fingerprint: str, sensor_ok: bool = True) -> str:
     """Create a fake _abck cookie value for the demo."""
     # The real format is much more complex. This is good enough for the demo gateway.
-    h = hashlib.md5(f"{session_id}:{bot_score}".encode()).hexdigest()[:16]
+    h = hashlib.md5(f"{session_id}:{fingerprint}".encode()).hexdigest()[:16]
     return f"{h}~{status}~0~0~1~||-1"
 
 
@@ -105,3 +104,4 @@ def format_ak_bmsc(session_id: str) -> str:
 def get_sensor_meta(session_id: str) -> Dict[str, Any]:
     # Placeholder; real impl would read from Redis in some setups
     return {}
+

@@ -1,4 +1,4 @@
-﻿version: "3.9"
+version: "3.9"
 
 services:
   defense-redis:
@@ -76,3 +76,8 @@ services:
       - fraud-engine
     ports:
       - "8090:8090"
+
+networks:
+  default:
+    name: ttm-bot-2026_default
+    external: true

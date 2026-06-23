@@ -1,8 +1,15 @@
-﻿(function (global) {
+(function (global) {
   const ENDPOINT = "/api/telemetry";
   let sessionId = localStorage.getItem("defense_session_id");
   if (!sessionId) {
-    sessionId = crypto.randomUUID();
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+      sessionId = crypto.randomUUID();
+    } else {
+      sessionId = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == "x" ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
     localStorage.setItem("defense_session_id", sessionId);
   }
   let tokenIssuedAt = parseFloat(localStorage.getItem("defense_token_issued_at") || "0");
@@ -42,7 +49,14 @@
   });
   document.addEventListener("scroll", () => track("scroll", { deltaY: window.scrollY }));
 
-  global.DefenseTelemetry = { track, flush, setTokenIssuedAt, sessionId };
+  function syncSessionId(newId) {
+    if (newId && newId !== sessionId) {
+      sessionId = newId;
+      localStorage.setItem("defense_session_id", sessionId);
+    }
+  }
+
+  global.DefenseTelemetry = { track, flush, setTokenIssuedAt, syncSessionId, get sessionId() { return sessionId; } };
   setInterval(flush, 3000);
   window.addEventListener("beforeunload", flush);
 })(window);

@@ -1,4 +1,4 @@
-﻿import json
+import json
 import sys
 import time
 from pathlib import Path
@@ -66,11 +66,12 @@ from shared.config import (
     SENSOR_SESSION_TTL_SEC,
 )
 try:
-    from shared.events import clear_all_defense_data, get_audit_events, log_event, summarize_audit_events
+    from shared.events import clear_all_defense_data, get_audit_events, log_event, summarize_audit_events, reset_seats_and_sessions
 except Exception:
     from shared.events import get_audit_events, log_event  # type: ignore
     def clear_all_defense_data(): pass  # type: ignore
-    def summarize_audit_events(): return {"total": 0, "by_layer": {}}  # type: ignore
+    def summarize_audit_events(events=None): return {"total": 0, "by_layer": {}, "passed": 0}  # type: ignore
+    def reset_seats_and_sessions(): return {"status": "ok", "deleted_keys": 0}  # type: ignore
     # Also ensure log_event is available under the name used later
     if 'log_event' not in dir():
         from shared.events import log_event  # type: ignore
@@ -186,6 +187,93 @@ def admin_clear_all():
     return result
 
 
+@app.post("/admin/api/reset-seats")
+def admin_reset_seats():
+    """Reset seats, sessions, carts — keep audit logs."""
+    result = reset_seats_and_sessions()
+    log_event("edge", "admin_reset_seats", "", "", result, blocked=False)
+    return result
+
+
+class SaleStartRequest(BaseModel):
+    delay_seconds: int
+
+@app.post("/admin/api/set-sale-start")
+async def admin_set_sale_start(req: SaleStartRequest, request: Request):
+    """Set the sale start time (pre-queue countdown)."""
+    start_time = time.time() + req.delay_seconds
+    r.set("defense:config:sale_start", str(start_time))
+    log_event("edge", "admin_set_sale_start", "", client_ip(request), {"start_time": start_time}, blocked=False)
+    return {"success": True, "sale_start": start_time}
+
+class SimulationRequest(BaseModel):
+    enabled: bool
+
+@app.post("/admin/api/set-simulation")
+async def admin_set_simulation(req: SimulationRequest, request: Request):
+    """Enable or disable the background bot simulator."""
+    r.set("defense:config:bot_simulation", "1" if req.enabled else "0")
+    log_event("edge", "admin_set_simulation", "", client_ip(request), {"enabled": req.enabled}, blocked=False)
+    return {"success": True, "enabled": req.enabled}
+
+@app.get("/api/event-config")
+def get_event_config():
+    raw = r.get("defense:config:event")
+    if raw:
+        return json.loads(raw)
+    return {
+        "eventId": "bts-arirang-2026",
+        "eventName": "BTS WORLD TOUR 'ARIRANG' IN BANGKOK",
+        "maxTicketsPerAccount": 4,
+        "zones": [
+            {"id": "VIP", "name": "VIP (V1-V16)", "price": 7800, "color": "#c084fc", "isRestricted": False},
+            {"id": "RED", "name": "Red Zone (A1-A24)", "price": 6800, "color": "#ef4444", "isRestricted": False},
+            {"id": "RED_RESTRICTED", "name": "Red (Restricted View)", "price": 6800, "color": "#991b1b", "isRestricted": True},
+            {"id": "BLUE", "name": "Blue Zone", "price": 6300, "color": "#3b82f6", "isRestricted": False},
+            {"id": "YELLOW", "name": "Yellow/Orange Zone", "price": 5300, "color": "#eab308", "isRestricted": False},
+            {"id": "GREEN", "name": "Green Zone", "price": 4300, "color": "#22c55e", "isRestricted": False},
+            {"id": "TEAL", "name": "Teal/Light Blue Zone", "price": 3300, "color": "#14b8a6", "isRestricted": False}
+        ]
+    }
+
+
+def get_defense_toggles() -> dict:
+    raw = r.get("defense:config:toggles")
+    if raw:
+        return json.loads(raw)
+    return {
+        "waf": True,
+        "akamai": True,
+        "bot_bypass": True,
+        "graphql": False,
+        "queue": True,
+        "three_ds": True,
+        "bot_simulation": r.get("defense:config:bot_simulation") in [b"1", "1"]
+
+    }
+
+
+@app.get("/api/defense-toggles")
+def get_toggles_api():
+    return get_defense_toggles()
+
+
+@app.post("/api/defense-toggles")
+async def update_toggles_api(request: Request):
+    data = await request.json()
+    r.set("defense:config:toggles", json.dumps(data))
+    log_event("edge", "admin_update_toggles", "", client_ip(request), data, blocked=False)
+    return {"success": True, "toggles": data}
+
+
+@app.post("/api/event-config")
+async def update_event_config(request: Request):
+    data = await request.json()
+    r.set("defense:config:event", json.dumps(data))
+    log_event("edge", "admin_update_event_config", "", client_ip(request), data, blocked=False)
+    return {"success": True, "config": data}
+
+
 @app.get("/admin")
 def admin():
     return FileResponse(str(FRONTEND / "admin.html"))
@@ -194,8 +282,8 @@ def admin():
 @app.get("/api/event-config")
 def event_config():
     return {
-        "event_id": DEFAULT_EVENT_ID,
-        "event_name": DEFAULT_EVENT_NAME,
+        "event_id": "bts-arirang-2026",
+        "event_name": "BTS WORLD TOUR 'ARIRANG' IN BANGKOK",
         "purchase_limit_minutes": PURCHASE_LIMIT_MINUTES,
         "sensor_file_hash": "a3f8c2e9",
     }
@@ -220,15 +308,23 @@ async def submit_sensor(request: Request):
         session_id = __import__("uuid").uuid4().hex
 
     bump_request_count(session_id)
-    cookie_hash = cookie_hash_from_abck(request.cookies.get("_abck", ""))
-    signals, err = decode_sensor_payload(body.sensor_data, cookie_hash)
-    if signals is None:
-        log_event("akamai", "sensor_decode_fail", session_id, ip, {"error": err}, blocked=True)
-        raise HTTPException(status_code=400, detail={"error": "SENSOR_INVALID", "reason": err})
+    toggles = get_defense_toggles()
 
-    fingerprint = body.fingerprint or signals.get("fingerprint", session_id)
-    bot_score = compute_bot_score(signals)
-    challenged = bot_score >= 55
+    if not toggles.get("akamai", True):
+        bot_score = 0
+        challenged = False
+        fingerprint = body.fingerprint or session_id
+        signals = {"signal_count": 0}
+    else:
+        cookie_hash = cookie_hash_from_abck(request.cookies.get("_abck", ""))
+        signals, err = decode_sensor_payload(body.sensor_data, cookie_hash)
+        if signals is None:
+            log_event("akamai", "sensor_decode_fail", session_id, ip, {"error": err}, blocked=True)
+            raise HTTPException(status_code=400, detail={"error": "SENSOR_INVALID", "reason": err})
+
+        fingerprint = body.fingerprint or signals.get("fingerprint", session_id)
+        bot_score = compute_bot_score(signals)
+        challenged = bot_score >= 55
 
     payload = {
         "session_id": session_id,
@@ -281,6 +377,11 @@ async def challenge_pass(request: Request):
     _set_akamai_cookies(resp, session_id, fingerprint, bot_score, False)
     log_event("akamai", "challenge_passed_gateway", session_id, client_ip(request), {"bot_score": bot_score})
     return resp
+
+
+@app.get("/member-code")
+def member_code_page():
+    return FileResponse(str(FRONTEND / "member-code.html"))
 
 
 @app.get("/seats")
@@ -340,6 +441,7 @@ async def _handle_queue_status(
         "issuedAt": data.get("issued_at"),
         "botScore": data.get("botScore"),
         "challengeRequired": data.get("challengeRequired", False),
+        "startTime": data.get("startTime"),
     }
 
 
@@ -396,6 +498,8 @@ async def _handle_checkout(
             "session_id": session_id,
             "card_number": card.get("number", ""),
             "buyer_email": buyer.get("email", ""),
+            "payment_method": inp.get("paymentMethod", "credit_card"),
+            "attendees": inp.get("attendees", []),
         },
     )
     if resp.status_code >= 400:
@@ -454,7 +558,8 @@ async def funnel_checkout(request: Request):
 
 @app.post("/graphql/v2")
 async def graphql_v2(request: Request):
-    if not GRAPHQL_ENABLED:
+    toggles = get_defense_toggles()
+    if not toggles.get("graphql", False):
         log_event(
             "edge",
             "graphql_disabled",
@@ -507,6 +612,16 @@ async def three_ds_verify(request: Request):
     body = await request.json()
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.post(f"{PAYMENT_SERVICE_URL}/internal/3ds/verify", json=body)
+        if resp.status_code >= 400:
+            raise HTTPException(status_code=resp.status_code, detail=resp.json().get("detail"))
+        return resp.json()
+
+
+@app.post("/api/qr/verify")
+async def qr_verify(request: Request):
+    body = await request.json()
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.post(f"{PAYMENT_SERVICE_URL}/internal/qr/verify", json=body)
         if resp.status_code >= 400:
             raise HTTPException(status_code=resp.status_code, detail=resp.json().get("detail"))
         return resp.json()

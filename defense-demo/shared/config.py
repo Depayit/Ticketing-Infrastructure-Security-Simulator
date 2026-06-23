@@ -1,8 +1,8 @@
-﻿import os
+import os
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/1")
 TOKEN_TTL_SEC = int(os.environ.get("TOKEN_TTL_SEC", "1200"))
-SEAT_LOCK_TTL_SEC = int(os.environ.get("SEAT_LOCK_TTL_SEC", "900"))
+SEAT_LOCK_TTL_SEC = int(os.environ.get("SEAT_LOCK_TTL_SEC", "300"))
 ADMISSION_RATE = int(os.environ.get("ADMISSION_RATE", "50"))
 FRAUD_ENGINE_URL = os.environ.get("FRAUD_ENGINE_URL", "http://localhost:8094")
 QUEUE_SERVICE_URL = os.environ.get("QUEUE_SERVICE_URL", "http://localhost:8091")
@@ -10,7 +10,7 @@ SEAT_SERVICE_URL = os.environ.get("SEAT_SERVICE_URL", "http://localhost:8092")
 PAYMENT_SERVICE_URL = os.environ.get("PAYMENT_SERVICE_URL", "http://localhost:8093")
 MOCK_CAPTCHA_SITEKEY = "0xDEFENSE_DEMO_TURNSTILE"
 DEFAULT_EVENT_ID = "demo-concert-2026"
-DEFAULT_EVENT_NAME = "2026-27 JACOB WORLD TOUR IN BANGKOK"
+DEFAULT_EVENT_NAME = "BTS WORLD TOUR 'ARIRANG' IN BANGKOK"
 PURCHASE_LIMIT_MINUTES = int(os.environ.get("PURCHASE_LIMIT_MINUTES", "10"))
 AI_LAYER_ENABLED = os.environ.get("AI_LAYER_ENABLED", "true").lower() == "true"
 THREE_DS_OTP = os.environ.get("THREE_DS_OTP", "123456")

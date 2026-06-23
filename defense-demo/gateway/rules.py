@@ -1,4 +1,4 @@
-﻿import json
+import json
 import time
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -29,6 +29,12 @@ def is_datacenter(isp: str) -> bool:
 
 class WAFMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
+        toggles_raw = r.get("defense:config:toggles")
+        toggles = json.loads(toggles_raw) if toggles_raw else {"waf": True}
+        
+        if not toggles.get("waf", True):
+            return await call_next(request)
+
         ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown")
         if "," in ip:
             ip = ip.split(",")[0].strip()

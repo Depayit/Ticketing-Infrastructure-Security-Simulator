@@ -36,6 +36,18 @@ services:
       - PROXY_ROTATOR_URL=http://proxy-rotator:8080
     restart: unless-stopped
 
+  telegram-dashboard:
+    build:
+      context: .
+      dockerfile: ./manager/Dockerfile
+    container_name: ttm-telegram-dashboard
+    command: python telegram_bot.py
+    depends_on:
+      - redis
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    restart: unless-stopped
+
   worker:
     build:
       context: ./worker
@@ -51,8 +63,10 @@ services:
     environment:
       - REDIS_URL=redis://redis:6379/0
       - PROXY_ROTATOR_URL=http://proxy-rotator:8080
+      - GEMINI_API_KEY=AIzaSyD_PnXjcRMGdAfgiunVu8oo_x49-X2T4yA
     restart: unless-stopped
 
 volumes:
   redis_data:
+
 

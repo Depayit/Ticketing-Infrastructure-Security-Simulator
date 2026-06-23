@@ -1,7 +1,0 @@
-{
-  "telegram_token": "YOUR_TELEGRAM_BOT_TOKEN",
-  "telegram_chat_id": "YOUR_CHAT_ID",
-  "captcha_key": "YOUR_2CAPTCHA_KEY",
-  "redis_url": "redis://redis:6379/0",
-  "event_id": "ttm-bkk-blackpink-world-tour-2026"
-}

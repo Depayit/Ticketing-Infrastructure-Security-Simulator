@@ -15,7 +15,7 @@ WORKDIR /app
 COPY manager/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY manager/main.py .
+COPY manager/*.py .
 COPY --from=frontend-build /app/dist ./static
 
 CMD ["python", "main.py"]

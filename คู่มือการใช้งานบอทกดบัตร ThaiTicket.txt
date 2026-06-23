@@ -133,7 +133,6 @@ docker stack deploy -c docker-compose.yml ttm-bot
 ================================================================
 พัฒนาเพื่อการศึกษาและทดสอบระบบอัตโนมัติ
 ใช้งานด้วยความระมัดระวัง
-
 License
 พัฒนาโดย Jacob Nuttapong
 เวอร์ชัน: 2026.05 Production Grade

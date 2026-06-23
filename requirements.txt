@@ -1,7 +1,0 @@
-httpx[http2]
-gql
-aiosqlite
-redis
-python-telegram-bot==21.4
-fastapi
-uvicorn[standard]
