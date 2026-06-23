@@ -53,32 +53,7 @@ The platform is designed around a distributed architecture consisting of multipl
 
 ---
 
-## System Architecture
-
-```text
-                +------------------+
-                |    Dashboard     |
-                +---------+--------+
-                          |
-                          v
-                +------------------+
-                |     Manager      |
-                +---------+--------+
-                          |
-          +---------------+---------------+
-          |                               |
-          v                               v
-   +-------------+                +-------------+
-   |  Worker #1  |                |  Worker #N  |
-   +-------------+                +-------------+
-          |                               |
-          +---------------+---------------+
-                          |
-                          v
-                   +-------------+
-                   |    Redis    |
-                   +-------------+
-```
+![System Architecture](docs/images/ChatGPT Image 23 มิ.ย. 2569 12_25_09.png)
 
 ---
 
