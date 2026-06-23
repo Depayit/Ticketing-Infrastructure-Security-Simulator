@@ -55,8 +55,7 @@ The platform is designed around a distributed architecture consisting of multipl
 
 # System Architecture
 
-(https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator/blob/main/doc/images/ChatGPT%20Image%2023%20%E0%B8%A1%E0%B8%B4.%E0%B8%A2.%202569%2012_25_09.png)
-
+![Ticketing-Infrastructure-Security-Simulator](docs/images/ChatGPT Image 23 มิ.ย. 2569 12_25_09.png)
 ---
 
 ## Components
