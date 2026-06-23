@@ -55,7 +55,7 @@ The platform is designed around a distributed architecture consisting of multipl
 
 # System Architecture
 
-![System Architecture](docs/images/ChatGPTImage23มิ.ย.256912_25_09.png)
+!(docs/images/ChatGPTImage23มิ.ย.256912_25_09.png)
 
 ---
 
