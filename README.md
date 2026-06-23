@@ -1,41 +1,209 @@
-# Concert Ticket Bot 2026
-บอทกดบัตรคอนเสิร์ตปี 2026 เวอร์ชัน Production
-**เทคโนโลยีหลัก**: GraphQL + Queue-it Bypass + Auto CAPTCHA Solver (2Captcha) + Docker Swarm + FastAPI Dashboard + TypeScript React
----
-## คุณสมบัติ
-- ใช้ **GraphQL API** โดยตรง (เร็วและมีประสิทธิภาพสูง)
-- รองรับ **Queue-it Bypass** + Auto Solve Turnstile CAPTCHA
-- มี **Manager/Worker Architecture** แยกชัดเจน
-- Dashboard แบบ Real-time (React + TypeScript + Tailwind)
-- Auto Stop เมื่อมีเครื่องใดเครื่องหนึ่งซื้อสำเร็จ (ผ่าน Redis)
-- Telegram Notification ทันทีเมื่อได้บัตร
-- บันทึก Order ลง Database
-- รองรับการรันหลายสิบถึงหลายร้อย instances พร้อมกัน
-- Deploy ด้วย Docker Swarm + Ansible
----
-## Tech Stack
-- **Backend**: Python 3.11, FastAPI, gql, httpx, Redis
-- **Frontend**: React + TypeScript + TailwindCSS + Vite
-- **Infrastructure**: Docker, Docker Swarm, Redis
-- **CAPTCHA Solver**: 2Captcha (รองรับ Turnstile)
-- **Notification**: Telegram Bot
----
-## โครงสร้างโปรเจกต์
-ticket-bot-2026/ ├── manager/ # Dashboard + Control Panel ├── worker/ # บอทหลัก (GraphQL Bot) ├── frontend/ # โค้ด React TypeScript ├── docker-compose.yml ├── ansible-deploy.yml ├── README.md └── MANUAL.txt # คู่มือการใช้งานฉบับละเอียด
+# Ticketing Infrastructure Security Simulator
 
-
+A distributed security research platform designed to study large-scale ticketing systems, queue protection mechanisms, fraud detection controls, and automation-driven attacks in a controlled environment.
 
 ---
-## การติดตั้งด่วน (Quick Start)
-1. Clone โปรเจกต์
-2. แก้ไขไฟล์ `config.json` ในโฟลเดอร์ `worker/` และ `manager/`
-3. รันคำสั่ง:
-   ```bash
-   docker compose up -d --build
-เข้าใช้งาน Dashboard ได้ที่ http://your-ip:8080
-ดูรายละเอียดการติดตั้งและการใช้งานแบบละเอียดได้ที่ไฟล์ MANUAL.txt
 
-คำเตือน
-บอทนี้มีไว้เพื่อการศึกษาและทดสอบทางเทคนิคเท่านั้น
-การใช้บอทอาจผิดเงื่อนไขการใช้งานของเว็บไซต์จำหน่ายบัตร
-ผู้ใช้ต้องรับผิดชอบเองทั้งหมด
+## Overview
+
+Modern ticketing platforms face increasing challenges from automated purchasing systems, proxy networks, session farming, and large-scale bot operations.
+
+This project provides a research environment for analyzing both offensive automation techniques and defensive security controls commonly found in ticketing infrastructures.
+
+The platform is designed around a distributed architecture consisting of multiple workers, centralized orchestration, real-time monitoring, and fraud-defense simulation components.
+
+---
+
+## Key Features
+
+### Distributed Worker Architecture
+
+* Centralized task orchestration
+* Multi-worker execution model
+* Horizontal scaling support
+* Redis-based coordination
+
+### Automation Research
+
+* Session lifecycle simulation
+* Request scheduling
+* Behavioral pattern analysis
+* Queue interaction modeling
+
+### Defense Simulation
+
+* Fraud detection engine
+* Rate limiting simulation
+* Queue protection mechanisms
+* Behavioral anomaly detection
+
+### Monitoring & Telemetry
+
+* Real-time worker monitoring
+* Event collection
+* Execution statistics
+* Operational dashboard
+
+### Frontend Dashboard
+
+* Live worker status
+* Task monitoring
+* Queue visibility
+* System management interface
+
+---
+
+## System Architecture
+
+```text
+                +------------------+
+                |    Dashboard     |
+                +---------+--------+
+                          |
+                          v
+                +------------------+
+                |     Manager      |
+                +---------+--------+
+                          |
+          +---------------+---------------+
+          |                               |
+          v                               v
+   +-------------+                +-------------+
+   |  Worker #1  |                |  Worker #N  |
+   +-------------+                +-------------+
+          |                               |
+          +---------------+---------------+
+                          |
+                          v
+                   +-------------+
+                   |    Redis    |
+                   +-------------+
+```
+
+---
+
+## Components
+
+### Manager
+
+Responsible for:
+
+* Task scheduling
+* Worker coordination
+* System state management
+* Event aggregation
+
+### Workers
+
+Responsible for:
+
+* Task execution
+* Session management
+* Queue interaction simulation
+* Result reporting
+
+### Proxy Rotator
+
+Responsible for:
+
+* Proxy pool management
+* Rotation policies
+* Request distribution
+
+### Defense Demo
+
+Responsible for:
+
+* Simulated protection mechanisms
+* Fraud scoring
+* Detection logic evaluation
+
+### Frontend
+
+Provides:
+
+* Operational visibility
+* Worker control
+* Real-time monitoring
+* Research analytics
+
+---
+
+## Security Research Objectives
+
+This project focuses on understanding:
+
+* Automated purchasing behavior
+* Queue system resilience
+* Fraud prevention effectiveness
+* Detection evasion techniques
+* Infrastructure bottlenecks
+
+The platform is intended for educational, research, and defensive security purposes.
+
+---
+
+## Technology Stack
+
+### Backend
+
+* Python
+* FastAPI
+* Redis
+* WebSocket
+
+### Frontend
+
+* React
+* TypeScript
+* Vite
+
+### Infrastructure
+
+* Docker
+* Docker Compose
+
+---
+
+## Project Structure
+
+```text
+project/
+├── manager/
+├── worker/
+├── frontend/
+├── proxy-rotator/
+├── bot-connector/
+├── defense-demo/
+├── docs/
+└── docker/
+```
+
+---
+
+## Future Roadmap
+
+* Threat Modeling Framework
+* Advanced Fraud Analytics
+* Grafana Integration
+* Prometheus Metrics
+* CI/CD Security Pipeline
+* Distributed Load Testing
+* Behavioral Detection Engine
+* AI-assisted Security Analysis
+
+---
+
+## Disclaimer
+
+This project is intended for security research, educational use, and defensive testing in authorized environments only.
+
+Users are responsible for ensuring compliance with applicable laws, regulations, and platform terms of service.
+
+---
+
+## Author
+
+Jacob Nuttapong (Depayit)
+
+Cybersecurity Researcher | Security Automation | Distributed Systems | AI Security
