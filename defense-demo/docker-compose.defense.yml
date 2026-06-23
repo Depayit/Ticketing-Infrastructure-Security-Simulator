@@ -79,5 +79,5 @@ services:
 
 networks:
   default:
-    name: ttm-bot-2026_default
+    name: Ticket-bot-2026_default
     external: true

@@ -39,14 +39,14 @@
 }
 
 .stepper-item.active .stepper-circle {
-  background: var(--ttm-red);
+  background: var(--Ticket-red);
   color: #fff;
-  border-color: var(--ttm-red);
+  border-color: var(--Ticket-red);
   box-shadow: 0 0 0 4px rgba(185, 28, 28, 0.15);
 }
 
 .stepper-item.active {
-  color: var(--ttm-red);
+  color: var(--Ticket-red);
 }
 
 .stepper-item.done .stepper-circle {
@@ -170,7 +170,7 @@
 .order-price {
   font-weight: 700;
   font-size: 1.05rem;
-  color: var(--ttm-red);
+  color: var(--Ticket-red);
 }
 
 /* ---------- Section ---------- */
@@ -207,13 +207,13 @@
 }
 
 .promo-card:hover {
-  border-color: var(--ttm-red);
+  border-color: var(--Ticket-red);
   box-shadow: 0 2px 12px rgba(185, 28, 28, 0.1);
   transform: translateY(-1px);
 }
 
 .promo-card.selected {
-  border-color: var(--ttm-red);
+  border-color: var(--Ticket-red);
   background: #fef2f2;
 }
 
@@ -305,7 +305,7 @@
 }
 
 .delivery-card.selected {
-  border-color: var(--ttm-red);
+  border-color: var(--Ticket-red);
   background: #fef2f2;
 }
 
@@ -351,7 +351,7 @@
 }
 
 .payment-card.selected {
-  border-color: var(--ttm-red);
+  border-color: var(--Ticket-red);
   background: #fef2f2;
 }
 
@@ -420,7 +420,7 @@
 
 .cc-form-card input:focus {
   outline: none;
-  border-color: var(--ttm-red);
+  border-color: var(--Ticket-red);
   box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.1);
   background: #fff;
 }
@@ -534,7 +534,7 @@
 
 .sticky-caret {
   font-size: 0.65rem;
-  color: var(--ttm-red);
+  color: var(--Ticket-red);
   vertical-align: middle;
 }
 
@@ -546,7 +546,7 @@
   padding: 14px 32px;
   border: none;
   border-radius: 8px;
-  background: var(--ttm-red);
+  background: var(--Ticket-red);
   color: #fff;
   font-size: 1rem;
   font-weight: 700;
@@ -671,7 +671,7 @@
 }
 
 .otp-resend a {
-  color: var(--ttm-blue);
+  color: var(--Ticket-blue);
   font-weight: 600;
   text-decoration: none;
 }
@@ -736,12 +736,12 @@
 }
 
 .btn-back-home {
-  background: var(--ttm-blue);
+  background: var(--Ticket-blue);
   box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
 }
 
 .btn-back-home:hover:not(:disabled) {
-  background: var(--ttm-blue-hover);
+  background: var(--Ticket-blue-hover);
   box-shadow: 0 4px 16px rgba(37, 99, 235, 0.35);
 }
 

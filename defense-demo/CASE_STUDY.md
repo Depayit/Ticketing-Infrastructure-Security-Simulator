@@ -1,4 +1,4 @@
-﻿# Defense Demo Case Study — TTM High-Demand Event
+# Defense Demo Case Study — Ticket High-Demand Event
 
 ## Overall Risk: **สูง (High)**
 
@@ -30,7 +30,7 @@ for i in {1..20}; do curl -s -o /dev/null -w "%{http_code}\n" -X POST http://loc
   -d '{"query":"query { queueStatus(eventId: \"demo-concert-2026\") { status token } }"}'; done
 ```
 
-### Scenario B — ttm-bot Worker → AI Layer
+### Scenario B — Ticket-bot Worker → AI Layer
 1. ตั้ง `graphql_url` ใน worker config เป็น `http://defense-gateway:8090/graphql/v2`
 2. ตั้ง `event_id` เป็น `demo-concert-2026`
 3. รัน worker — bot ยิง GraphQL ตรงไม่มี telemetry → **403 FRAUD_DETECTED**

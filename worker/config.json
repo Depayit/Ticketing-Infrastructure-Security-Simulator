@@ -1,5 +1,5 @@
 {
-    "event_id":  "ttm-bkk-blackpink-world-tour-2026",
+    "event_id":  "concert-blackpink-world-tour-2026",
     "telegram_token":  "YOUR_TELEGRAM_BOT_TOKEN_HERE",
     "telegram_chat_id":  "YOUR_CHAT_ID_HERE",
     "gemini_api_key": "AIzaSyD_PnXjcRMGdAfgiunVu8oo_x49-X2T4yA",
@@ -39,7 +39,7 @@
                               "Standing"
                           ],
     "bot_mode":  "queueit",
-    "target_url":  "https://www.thaiticketmajor.com/concert/your-event-here",
+    "target_url":  "https://www.example-ticket.com/concert/your-event-here",
     "queueit":  {
                     "headless":  true,
                     "manual_takeover": false,

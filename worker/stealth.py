@@ -1,8 +1,8 @@
 """
-Stealth toolkit for the TTM worker's Playwright browser flow.
+Stealth toolkit for the ticket worker's Playwright browser flow.
 
 Single source of truth for the browser-side stealth concerns the bot needs
-to look like a real human in the ThaiTicketMajor + Queue-it funnel:
+to look like a real human in the ticket purchase + Queue-it funnel:
 
   1. **Advanced Fingerprint** (`build_fingerprint`)
      A deterministic, per-proxy fingerprint with 40+ signals. The same proxy

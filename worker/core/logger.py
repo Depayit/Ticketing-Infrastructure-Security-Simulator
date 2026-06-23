@@ -17,8 +17,8 @@ def send_log_sync(
     log_line = f"[{datetime.now().strftime('%H:%M:%S')}] [{level}] [{instance_id}] {message}"
     print(log_line)
     try:
-        r.lpush("ttm:logs", log_line)
-        r.ltrim("ttm:logs", 0, 100)
+        r.lpush("ticket:logs", log_line)
+        r.ltrim("ticket:logs", 0, 100)
     except Exception:
         pass
     return log_line

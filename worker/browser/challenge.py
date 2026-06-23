@@ -77,7 +77,7 @@ async def try_click_proceed_after_human_check(page, behavior, proceed_texts: Lis
         for sel in (
             "#btn-akamai-challenge",
             "#akamai-challenge-modal button",
-            "button.ttm-btn",
+            "button.ticket-btn",
         ):
             try:
                 loc = frame.locator(sel).first
@@ -136,7 +136,7 @@ async def solve_human_challenge(
 
 async def solve_final_captcha(page, behavior, log_func) -> bool:
     """
-    Solve the final stage CAPTCHA on ThaiTicketMajor without using AI.
+    Solve the final stage CAPTCHA on the ticket platform without using AI.
     Handles 5 captcha types: Quiz, Slider, Color Match, Sort Fan, Sort Lyric.
     Follows human behavior guidelines.
     """

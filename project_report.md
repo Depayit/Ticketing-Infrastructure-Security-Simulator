@@ -1,4 +1,4 @@
-# รายงานระบบ TTM Concert & Universal Purchase Bot 2026 (Production Version)
+# รายงานระบบ Concert Ticket & Universal Purchase Bot 2026 (Production Version)
 
 เอกสารฉบับนี้สรุปโครงสร้างสถาปัตยกรรม (Architecture), โหมดการทำงาน (Operation Modes), ส่วนประกอบของระบบ (Components), การเชื่อมต่อระหว่างบริการ (Service Orchestration) และกลไกของระบบบอทกดบัตรและสั่งซื้อสินค้าอัตโนมัติเวอร์ชันปรับปรุงป 2026 ที่ผ่านการอัปเกรดให้สามารถใช้งานแบบทั่วไป (Generalized) ได้ทั้งเว็บบันเทิงและเว็บพาณิชย์อิเล็กทรอนิกส์ทั่วไป
 
@@ -23,8 +23,8 @@ graph TD
     PR -->|เขียนรายการ Active Proxy| RD
     
     %% เส้นทางแยกตามโหมดการทำงาน
-    subgraph Mode: ThaiTicketMajor
-        WK1 -.->|1. ยิง GraphQL API| TTM[ThaiTicketMajor GraphQL]
+    subgraph Mode: Ticket Platform
+        WK1 -.->|1. ยิง GraphQL API| Ticket[Ticket Platform GraphQL]
         WK1 -.->|2. แก้ Turnstile CAPTCHA| CS[2Captcha / CapMonster API]
     end
     
@@ -42,8 +42,8 @@ graph TD
 
 ผู้ใช้งานสามารถสลับโหมดการทำงานได้โดยตรงผ่านทางหน้าจอตั้งค่าของ GUI Dashboard ซึ่งระบบจะสลับกลไกและฟังก์ชันการประมวลผลภายใน Worker ดังนี้:
 
-### 2.1. โหมด ThaiTicketMajor (GraphQL Bypass)
-* **รูปแบบ**: ยิง Request ไปยัง GraphQL API ของ ThaiTicketMajor (`https://api.thaiticketmajor.com/graphql/v2`) โดยตรง ไม่ผ่านหน้าเว็บเบราว์เซอร์หลัก ส่งผลให้มีความเร็วระดับมิลลิวินาที
+### 2.1. โหมด Ticket Platform (GraphQL Bypass)
+* **รูปแบบ**: ยิง Request ไปยัง GraphQL API ของ Ticket Platform (`https://api.Ticket Platform.com/graphql/v2`) โดยตรง ไม่ผ่านหน้าเว็บเบราว์เซอร์หลัก ส่งผลให้มีความเร็วระดับมิลลิวินาที
 * **จุดเด่น**:
   * **Background Token Warmup**: ระบบจะรันคอรันทีนเบื้องหลัง คอยดึง Turnstile CAPTCHA ไปถอดรหัสผ่านบริการ 2Captcha/CapMonster และแคชโทเค็นข้ามคิว (Queue-it Token Bypass) เก็บไว้ใน Redis ล่วงหน้า ทำให้เมื่อถึงเวลาเปิดขายจริง บอทสามารถกระโดดข้ามหน้าคิวได้ทันที
   * **Concurrent Purchase Wave**: สุ่มดึงโปรไฟล์ผู้ซื้อที่ตั้งค่าไว้และยิงคำสั่งซื้อ (`addToCart` และ `checkout` mutations) แบบขนานตามระดับสิทธิ์ความสำคัญของบัตร (Ticket Priorities) เช่น VIP > GA
@@ -64,10 +64,10 @@ graph TD
 
 ### 3.1. Redis Store (ตัวเก็บข้อมูลสถานะ)
 ทำหน้าที่ประสานงานข้อมูลของบริการทั้งหมด:
-* `ttm:config`: จัดเก็บคอนฟิกระบบที่ถูกบันทึกมาจากหน้า GUI
-* `ttm:command`: ค่าสถานะสั่งเริ่ม/หยุดงานบอท (`start` / `stop`)
-* `ttm:global_stop`: สัญญาณอินเตอร์รัปต์หลัก เมื่อบอทตัวใดตัวหนึ่งซื้อสำเร็จ จะตั้งค่านี้เป็น `1` เพื่อสั่งให้ทุกบอทหยุดยิงเซสชันทันที ป้องกันการจ่ายเงินซ้ำซ้อน
-* `ttm:logs`: คิวเก็บประวัติการทำงาน 100 บรรทัดล่าสุดสำหรับส่งแสดงผลแบบสด
+* `ticket:config`: จัดเก็บคอนฟิกระบบที่ถูกบันทึกมาจากหน้า GUI
+* `ticket:command`: ค่าสถานะสั่งเริ่ม/หยุดงานบอท (`start` / `stop`)
+* `ticket:global_stop`: สัญญาณอินเตอร์รัปต์หลัก เมื่อบอทตัวใดตัวหนึ่งซื้อสำเร็จ จะตั้งค่านี้เป็น `1` เพื่อสั่งให้ทุกบอทหยุดยิงเซสชันทันที ป้องกันการจ่ายเงินซ้ำซ้อน
+* `ticket:logs`: คิวเก็บประวัติการทำงาน 100 บรรทัดล่าสุดสำหรับส่งแสดงผลแบบสด
 
 ### 3.2. Proxy Rotator Service (บริการจัดการเครือข่าย)
 * **ISP Filter**: กรอง IP ที่มาจากเครื่องโฮสติ้งสาธารณะ (Datacenter IP เช่น AWS, Google Cloud) ออกไป เพื่อใช้เพียง Resident Proxy ของไทยที่มีคุณภาพสูงและเป็นไอพีบ้านจริง
@@ -94,15 +94,15 @@ graph TD
 
 | บริการ / ส่วนงาน | พาธของไฟล์ (File Path) | หน้าที่และความรับผิดชอบหลัก |
 | :--- | :--- | :--- |
-| **Global Infrastructure** | [docker-compose.yml](file:///c:/dev/ttm-bot-2026/docker-compose.yml) | ไฟล์ตั้งค่าและควบคุม Docker Containers ทั้งหมด (Redis, Rotator, Manager, Worker) |
-| **Proxy Management** | [proxy-rotator/main.py](file:///c:/dev/ttm-bot-2026/proxy-rotator/main.py) | ตรวจสอบ IP, แยกประเภทโฮสติ้ง, จัดสรร IP สลับหมุนเวียน |
-| **Dashboard Backend** | [manager/main.py](file:///c:/dev/ttm-bot-2026/manager/main.py) | หลังบ้าน Dashboard, ให้บริการ WebSocket Logs และ API คอนฟิก |
-| **Dashboard Frontend** | [frontend/src/components/Setup.tsx](file:///c:/dev/ttm-bot-2026/frontend/src/components/Setup.tsx) | ฟอร์มตั้งค่า GUI Dashboard รองรับการเปลี่ยนโหมดและบันทึกลงฐานข้อมูล |
-| **Dashboard Frontend** | [frontend/src/components/Dashboard.tsx](file:///c:/dev/ttm-bot-2026/frontend/src/components/Dashboard.tsx) | หน้าควบคุมสถานะการทำงานบอทแบบเรียลไทม์ |
-| **Dashboard Frontend** | [frontend/src/components/BrowserProfiles.tsx](file:///c:/dev/ttm-bot-2026/frontend/src/components/BrowserProfiles.tsx) | หน้าจอจำลองข้อมูลลายนิ้วมือเบราว์เซอร์และฮาร์ดแวร์ |
-| **Bot Worker Logic** | [worker/bot.py](file:///c:/dev/ttm-bot-2026/worker/bot.py) | ตัวทำงานบอทหลัก สลับโหมดประมวลผลระหว่าง Queue-it และ General Mode |
-| **AI Visual Recovery** | [worker/ai_recovery.py](file:///c:/dev/ttm-bot-2026/worker/ai_recovery.py) | ระบบประเมินและแก้ปัญหาหน้าจออัตโนมัติด้วย Vision LLM (Gemini API) |
-| **User Manual** | [คู่มือการใช้งานบอทกดบัตร ThaiTicket.txt](file:///c:/dev/ttm-bot-2026/คู่มือการใช้งานบอทกดบัตร%20ThaiTicket.txt) | เอกสารแนะนำการติดตั้ง การตั้งค่า และเทคนิคการกดบัตร |
+| **Global Infrastructure** | [docker-compose.yml](file:///c:/dev/ticket-bot-2026/docker-compose.yml) | ไฟล์ตั้งค่าและควบคุม Docker Containers ทั้งหมด (Redis, Rotator, Manager, Worker) |
+| **Proxy Management** | [proxy-rotator/main.py](file:///c:/dev/ticket-bot-2026/proxy-rotator/main.py) | ตรวจสอบ IP, แยกประเภทโฮสติ้ง, จัดสรร IP สลับหมุนเวียน |
+| **Dashboard Backend** | [manager/main.py](file:///c:/dev/ticket-bot-2026/manager/main.py) | หลังบ้าน Dashboard, ให้บริการ WebSocket Logs และ API คอนฟิก |
+| **Dashboard Frontend** | [frontend/src/components/Setup.tsx](file:///c:/dev/ticket-bot-2026/frontend/src/components/Setup.tsx) | ฟอร์มตั้งค่า GUI Dashboard รองรับการเปลี่ยนโหมดและบันทึกลงฐานข้อมูล |
+| **Dashboard Frontend** | [frontend/src/components/Dashboard.tsx](file:///c:/dev/ticket-bot-2026/frontend/src/components/Dashboard.tsx) | หน้าควบคุมสถานะการทำงานบอทแบบเรียลไทม์ |
+| **Dashboard Frontend** | [frontend/src/components/BrowserProfiles.tsx](file:///c:/dev/ticket-bot-2026/frontend/src/components/BrowserProfiles.tsx) | หน้าจอจำลองข้อมูลลายนิ้วมือเบราว์เซอร์และฮาร์ดแวร์ |
+| **Bot Worker Logic** | [worker/bot.py](file:///c:/dev/ticket-bot-2026/worker/bot.py) | ตัวทำงานบอทหลัก สลับโหมดประมวลผลระหว่าง Queue-it และ General Mode |
+| **AI Visual Recovery** | [worker/ai_recovery.py](file:///c:/dev/ticket-bot-2026/worker/ai_recovery.py) | ระบบประเมินและแก้ปัญหาหน้าจออัตโนมัติด้วย Vision LLM (Gemini API) |
+| **User Manual** | [คู่มือการใช้งานบอทกดบัตร Ticket.txt](file:///c:/dev/ticket-bot-2026/คู่มือการใช้งานบอทกดบัตร%20Ticket.txt) | เอกสารแนะนำการติดตั้ง การตั้งค่า และเทคนิคการกดบัตร |
 
 ---
 

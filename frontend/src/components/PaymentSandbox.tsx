@@ -234,7 +234,7 @@ export default function PaymentSandbox() {
           <div className="bg-emerald-50 rounded-xl p-5 mb-6 text-left border border-emerald-100">
             <div className="flex justify-between mb-2">
               <span className="text-zinc-500 text-sm">หมายเลขคำสั่งซื้อ</span>
-              <span className="font-mono font-semibold text-zinc-800 text-sm">TTM-20260603-8821</span>
+              <span className="font-mono font-semibold text-zinc-800 text-sm">TKT-20260603-8821</span>
             </div>
             <div className="flex justify-between mb-2">
               <span className="text-zinc-500 text-sm">จำนวนเงิน</span>

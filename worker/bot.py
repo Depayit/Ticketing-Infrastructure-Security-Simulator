@@ -39,9 +39,9 @@ def get_tg_bot_instances() -> List[tuple[telegram.Bot, str]]:
 def get_tg_bot() -> Optional[telegram.Bot]:
     return core.config.get_tg_bot(config)
 
-# ── TTMWorker ─────────────────────────────────────────────────────────────────
+# ── TicketWorker ──────────────────────────────────────────────────────────────
 
-class TTMWorker:
+class TicketWorker:
     def __init__(self):
         self.instance_id = f"worker-{uuid.uuid4().hex[:8]}"
         self.heartbeat_ttl = 30
@@ -249,28 +249,28 @@ class TTMWorker:
         r.delete(self.worker_key)
 
     async def global_stopped(self) -> bool:
-        return r.get("ttm:global_stop") == "1"
+        return r.get("ticket:global_stop") == "1"
 
     async def is_running(self) -> bool:
-        return r.get("ttm:running") == "1"
+        return r.get("ticket:running") == "1"
 
     async def is_worker_stopped(self) -> bool:
-        return r.get(f"ttm:stop:{self.instance_id}") == "1"
+        return r.get(f"ticket:stop:{self.instance_id}") == "1"
 
     async def set_global_stop(self):
-        r.set("ttm:global_stop", "1", ex=7200)
-        r.incr("ttm:success_count")
+        r.set("ticket:global_stop", "1", ex=7200)
+        r.incr("ticket:success_count")
         await self.send_log("🚨 ได้บัตรสำเร็จ! สั่งหยุดทุก worker แล้ว", "SUCCESS")
 
     async def _live_stream_task(self, page):
         import base64
         while True:
             try:
-                if r.get(f"ttm:live_stream:{self.instance_id}") == "1":
+                if r.get(f"ticket:live_stream:{self.instance_id}") == "1":
                     if not page.is_closed():
                         screenshot_bytes = await page.screenshot(type="jpeg", quality=40)
                         b64 = base64.b64encode(screenshot_bytes).decode('utf-8')
-                        r.setex(f"ttm:live_frame:{self.instance_id}", 10, b64)
+                        r.setex(f"ticket:live_frame:{self.instance_id}", 10, b64)
                     await asyncio.sleep(0.5)
                 else:
                     await asyncio.sleep(1.0)
@@ -280,16 +280,16 @@ class TTMWorker:
                     break
 
     async def _check_screenshot_command(self, page):
-        req_id = r.get(f"ttm:cmd:screenshot:{self.instance_id}")
+        req_id = r.get(f"ticket:cmd:screenshot:{self.instance_id}")
         if req_id:
             try:
-                r.delete(f"ttm:cmd:screenshot:{self.instance_id}")
+                r.delete(f"ticket:cmd:screenshot:{self.instance_id}")
                 await self.send_log("📸 AI Controller สั่งแคปหน้าจอ...", "INFO")
                 await asyncio.sleep(0.5)
                 screenshot_bytes = await page.screenshot(type="jpeg", quality=60)
                 import base64
                 b64 = base64.b64encode(screenshot_bytes).decode('utf-8')
-                r.setex(f"ttm:screenshot:{req_id}", 60, b64)
+                r.setex(f"ticket:screenshot:{req_id}", 60, b64)
             except Exception as e:
                 await self.send_log(f"⚠️ ถ่ายภาพหน้าจอไม่สำเร็จ: {e}", "WARN")
 
@@ -297,7 +297,7 @@ class TTMWorker:
         import redis.asyncio as aioredis
         async_r = aioredis.from_url(REDIS_URL, decode_responses=True)
         pubsub = async_r.pubsub()
-        await pubsub.subscribe(f"ttm:control:{self.instance_id}")
+        await pubsub.subscribe(f"ticket:control:{self.instance_id}")
         try:
             while not page.is_closed():
                 try:
@@ -325,7 +325,7 @@ class TTMWorker:
                 await asyncio.sleep(0.05)
         finally:
             try:
-                await pubsub.unsubscribe(f"ttm:control:{self.instance_id}")
+                await pubsub.unsubscribe(f"ticket:control:{self.instance_id}")
                 await pubsub.close()
                 await async_r.close()
             except Exception:
@@ -336,7 +336,7 @@ class TTMWorker:
         await self.send_log("🚨 [MANUAL TAKEOVER] บอทผ่านคิวแล้ว! เปิดหน้าจอ Live View เพื่อควบคุมมือได้ทันที...", "SUCCESS")
         
         # Turn on live stream automatically for 1 hour
-        r.setex(f"ttm:live_stream:{self.instance_id}", 3600, "1")
+        r.setex(f"ticket:live_stream:{self.instance_id}", 3600, "1")
         
         while not self.success:
             if await self.global_stopped() or not await self.is_running() or await self.is_worker_stopped():
@@ -936,8 +936,8 @@ class TTMWorker:
                 self.update_status("RUNNING", self.target_url)
 
                 try:
-                    if r.get("ttm:global_stop") == "1":
-                        r.delete("ttm:global_stop")
+                    if r.get("ticket:global_stop") == "1":
+                        r.delete("ticket:global_stop")
                         await self.send_log("🔄 ล้างสถานะ global_stop สำหรับรอบการทำงานใหม่", "INFO")
                 except Exception:
                     pass
@@ -961,4 +961,4 @@ class TTMWorker:
 
 
 if __name__ == "__main__":
-    asyncio.run(TTMWorker().run())
+    asyncio.run(TicketWorker().run())

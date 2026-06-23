@@ -6,7 +6,7 @@ from typing import Dict, List, Optional
 
 REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
 
-# Akamai / human-verification gate (TTM login, edge WAF, defense-demo challenge)
+# Akamai / human-verification gate (ticket login, edge WAF, defense-demo challenge)
 DEFAULT_HV_MARKERS = (
     "confirm you're a human",
     "please confirm you're a human",
@@ -34,7 +34,7 @@ DEFAULT_HV_PROCEED_TEXTS = (
     "ตกลง",
 )
 
-QUEUE_CAPTCHA_URL_TPL = "https://www.thaiticketmajor.com/concert/{event_id}"
+QUEUE_CAPTCHA_URL_TPL = "https://www.example-ticket.com/concert/{event_id}"
 
 _tg_bots_cache = {}  # token -> telegram.Bot
 
@@ -47,7 +47,7 @@ def _load_config_from_file() -> dict:
 
 def _load_config_from_redis(r: redis.Redis) -> Optional[dict]:
     try:
-        raw = r.get("ttm:config")
+        raw = r.get("ticket:config")
         if raw:
             return json.loads(raw)
     except Exception:

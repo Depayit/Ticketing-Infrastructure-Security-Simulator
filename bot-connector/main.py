@@ -27,7 +27,7 @@ REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 CONNECTOR_PORT = int(os.environ.get("CONNECTOR_PORT", "8100"))
 
 app = FastAPI(
-    title="TTM Bot Connector",
+    title="Ticket Bot Connector",
     description="API สำหรับ Bot ภายนอกเชื่อมต่อและทดสอบใน Defense Demo Sandbox",
     version="1.0.0",
 )

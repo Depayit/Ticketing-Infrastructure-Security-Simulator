@@ -1,4 +1,4 @@
-คู่มือการใช้งานบอทกดบัตร ThaiTicketMajor 2026 (Production Version)
+คู่มือการใช้งานบอทกดบัตร Ticket Platform 2026 (Production Version)
 ================================================================
 
 วันที่สร้าง: 24 พฤษภาคม 2026
@@ -7,7 +7,7 @@
 1. คำเตือนสำคัญ
 --------------------
 - บอทนี้ใช้สำหรับการศึกษาระบบอัตโนมัติและการพัฒนาเท่านั้น
-- การใช้บอทอาจผิดเงื่อนไขการใช้งานของ ThaiTicketMajor
+- การใช้บอทอาจผิดเงื่อนไขการใช้งานของ Ticket Platform
 - ผู้ใช้งานต้องรับผิดชอบเองทั้งหมด
 - ควรใช้ Residential Proxy ไทยคุณภาพสูงเท่านั้น
 - แนะนำให้ทดสอบกับ event เล็ก ๆ ก่อน
@@ -24,7 +24,7 @@
 
 3. โครงสร้างโฟลเดอร์
 ----------------------
-TTM-BOT-2026/
+ticket-bot-2026/
 ├── manager/
 │   ├── main.py
 │   ├── config.json
@@ -54,7 +54,7 @@ TTM-BOT-2026/
 -------------------------
 **worker/config.json**
 {
-  "event_id": "ttm-bkk-blackpink-world-tour-2026",
+  "event_id": "concert-blackpink-world-tour-2026",
   "telegram_token": "YOUR_TELEGRAM_BOT_TOKEN",
   "telegram_chat_id": "YOUR_CHAT_ID",
   "captcha_key": "YOUR_2CAPTCHA_KEY",
@@ -76,11 +76,11 @@ TTM-BOT-2026/
 
 ###ขั้นตอนที่ 3: รันด้วย Docker
 -------------------------
-cd TTM-BOT-2026
+cd ticket-bot-2026
 docker compose up -d --build
 
 หรือใช้ Swarm:
-docker stack deploy -c docker-compose.yml ttm-bot
+docker stack deploy -c docker-compose.yml ticket-bot
 
 ###5. การใช้งาน
 --------------
@@ -118,7 +118,7 @@ docker stack deploy -c docker-compose.yml ttm-bot
 
 ##8. การอัปเดต
 --------------
-- Endpoint และ Mutation ของ ThaiTicketMajor เปลี่ยนบ่อย
+- Endpoint และ Mutation ของ Ticket Platform เปลี่ยนบ่อย
 - ควร capture GraphQL จาก Chrome DevTools ทุกครั้งก่อน event ใหญ่
 - อัปเดต User-Agent และ Header ให้ตรงกับปี 2026
 

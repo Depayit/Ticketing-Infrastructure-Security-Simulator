@@ -35,7 +35,7 @@ export default function AiAssistant() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'model',
-      text: 'สวัสดีครับ! ผมคือ AI Assistant ประจำระบบ TTM Stealth Bot คุณสามารถสอบถามสถานการณ์ของบอท หรือสั่งการทำงาน เช่น "เริ่มงานบอท", "หยุดบอท", หรือ "เปลี่ยน Target URL" ได้เลยครับ',
+      text: 'สวัสดีครับ! ผมคือ AI Assistant ประจำระบบ Ticket Stealth Bot คุณสามารถสอบถามสถานการณ์ของบอท หรือสั่งการทำงาน เช่น "เริ่มงานบอท", "หยุดบอท", หรือ "เปลี่ยน Target URL" ได้เลยครับ',
       timestamp: new Date(),
     },
   ]);

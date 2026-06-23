@@ -28,7 +28,7 @@ ASK_URL, ASK_EVENT_ID = range(2)
 
 def get_config():
     try:
-        raw = r.get("ttm:config")
+        raw = r.get("ticket:config")
         if raw:
             return json.loads(raw)
     except Exception as e:
@@ -37,8 +37,8 @@ def get_config():
 
 def save_config(config):
     config["_saved_at"] = datetime.now().isoformat()
-    r.set("ttm:config", json.dumps(config))
-    r.publish("ttm:config_updates", "updated")
+    r.set("ticket:config", json.dumps(config))
+    r.publish("ticket:config_updates", "updated")
 
 def get_bot_config_by_token(token: str) -> Optional[dict]:
     config = get_config()
@@ -115,14 +115,14 @@ def build_setup_keyboard(config):
 def get_status_text():
     config = get_config()
     active_workers = len(r.keys("worker:*"))
-    success_count = int(r.get("ttm:success_count") or 0)
-    is_running = r.get("ttm:running") == "1"
-    global_stop = r.get("ttm:global_stop") == "1"
+    success_count = int(r.get("ticket:success_count") or 0)
+    is_running = r.get("ticket:running") == "1"
+    global_stop = r.get("ticket:global_stop") == "1"
     
     try:
-        active_proxies = int(r.scard("ttm:proxies:active") or 0)
-        total_proxies = int(r.scard("ttm:proxies:raw") or 0)
-        dead_proxies = int(r.scard("ttm:proxies:dead") or 0)
+        active_proxies = int(r.scard("ticket:proxies:active") or 0)
+        total_proxies = int(r.scard("ticket:proxies:raw") or 0)
+        dead_proxies = int(r.scard("ticket:proxies:dead") or 0)
     except Exception:
         active_proxies = total_proxies = dead_proxies = 0
 
@@ -186,13 +186,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_name = query.from_user.first_name
 
     if action == "cmd_start":
-        r.delete("ttm:global_stop")
-        r.set("ttm:command", "start")
-        r.set("ttm:running", "1")
+        r.delete("ticket:global_stop")
+        r.set("ticket:command", "start")
+        r.set("ticket:running", "1")
         log_msg = f"[{datetime.now().strftime('%H:%M:%S')}] Telegram: ▶ START ALL WORKERS — ordered by {user_name}"
         logger.info(log_msg)
-        r.lpush("ttm:logs", log_msg)
-        r.ltrim("ttm:logs", 0, 99)
+        r.lpush("ticket:logs", log_msg)
+        r.ltrim("ticket:logs", 0, 99)
         
         await query.edit_message_text(
             text=f"✅ <b>Command sent: START ALL</b>\n\n" + get_status_text(),
@@ -203,13 +203,13 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
         
     elif action == "cmd_stop":
-        r.set("ttm:global_stop", "1", ex=7200)
-        r.set("ttm:command", "stop")
-        r.delete("ttm:running")
+        r.set("ticket:global_stop", "1", ex=7200)
+        r.set("ticket:command", "stop")
+        r.delete("ticket:running")
         log_msg = f"[{datetime.now().strftime('%H:%M:%S')}] Telegram: ⏹ STOP ALL WORKERS — ordered by {user_name}"
         logger.info(log_msg)
-        r.lpush("ttm:logs", log_msg)
-        r.ltrim("ttm:logs", 0, 99)
+        r.lpush("ticket:logs", log_msg)
+        r.ltrim("ticket:logs", 0, 99)
         
         await query.edit_message_text(
             text=f"✅ <b>Command sent: STOP ALL</b>\n\n" + get_status_text(),
@@ -232,7 +232,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return ConversationHandler.END
 
     elif action == "cmd_logs":
-        logs = r.lrange("ttm:logs", 0, 14)
+        logs = r.lrange("ticket:logs", 0, 14)
         if not logs:
             log_text = "No recent logs."
         else:
@@ -245,9 +245,9 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     elif action == "cmd_proxies":
         try:
-            active_proxies = int(r.scard("ttm:proxies:active") or 0)
-            total_proxies = int(r.scard("ttm:proxies:raw") or 0)
-            dead_proxies = int(r.scard("ttm:proxies:dead") or 0)
+            active_proxies = int(r.scard("ticket:proxies:active") or 0)
+            total_proxies = int(r.scard("ticket:proxies:raw") or 0)
+            dead_proxies = int(r.scard("ticket:proxies:dead") or 0)
         except Exception:
             active_proxies = total_proxies = dead_proxies = 0
             
@@ -298,7 +298,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         save_config(config)
         
         log_msg = f"[{datetime.now().strftime('%H:%M:%S')}] Telegram: ⚙️ Mode changed to {next_mode}"
-        r.lpush("ttm:logs", log_msg)
+        r.lpush("ticket:logs", log_msg)
         
         await query.edit_message_text(
             text=f"✅ Mode changed to <b>{next_mode}</b>.\n\n⚙️ <b>Bot Setup Menu</b>:",
@@ -330,7 +330,7 @@ async def handle_url_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     save_config(config)
     
     log_msg = f"[{datetime.now().strftime('%H:%M:%S')}] Telegram: ⚙️ Target URL updated"
-    r.lpush("ttm:logs", log_msg)
+    r.lpush("ticket:logs", log_msg)
     
     await update.message.reply_text(
         text=f"✅ Target URL updated to:\n<code>{new_url}</code>\n\n⚙️ <b>Bot Setup Menu</b>:",
@@ -349,7 +349,7 @@ async def handle_event_id_input(update: Update, context: ContextTypes.DEFAULT_TY
     save_config(config)
     
     log_msg = f"[{datetime.now().strftime('%H:%M:%S')}] Telegram: ⚙️ Event ID updated to {new_event}"
-    r.lpush("ttm:logs", log_msg)
+    r.lpush("ticket:logs", log_msg)
     
     await update.message.reply_text(
         text=f"✅ Event ID updated to: <code>{new_event}</code>\n\n⚙️ <b>Bot Setup Menu</b>:",
@@ -507,7 +507,7 @@ class TelegramBotManager:
                 await stop_bot(app)
 
         try:
-            r.set("ttm:telegram_bot_statuses", json.dumps(bot_statuses))
+            r.set("ticket:telegram_bot_statuses", json.dumps(bot_statuses))
         except Exception as e:
             logger.error(f"Failed to save bot statuses to Redis: {e}")
 
@@ -517,8 +517,8 @@ class TelegramBotManager:
         
         while True:
             try:
-                dead_proxies = int(r.scard("ttm:proxies:dead") or 0)
-                success_count = int(r.get("ttm:success_count") or 0)
+                dead_proxies = int(r.scard("ticket:proxies:dead") or 0)
+                success_count = int(r.get("ticket:success_count") or 0)
                 
                 if last_dead_count is not None and dead_proxies > last_dead_count:
                     diff = dead_proxies - last_dead_count

@@ -2,7 +2,7 @@
   "use strict";
 
   function renderDefenseFooter(queueIdEl) {
-    const footer = document.querySelector(".ttm-footer");
+    const footer = document.querySelector(".Ticket-footer");
     if (!footer || footer.dataset.rendered) return;
     footer.dataset.rendered = "1";
     footer.innerHTML =
@@ -16,7 +16,7 @@
   }
 
   function setPageTitle(suffix) {
-    const name = window.TTM_EVENT?.name || "TTM Event";
+    const name = window.ticket_EVENT?.name || "Ticket Event";
     document.title = "ThaiTicket Major — " + (suffix ? suffix + " · " : "") + name;
   }
 

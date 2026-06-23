@@ -4,35 +4,35 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ThaiTicket Major — Waiting Room</title>
-  <link rel="stylesheet" href="/static/ttm.css" />
+  <link rel="stylesheet" href="/static/Ticket.css" />
   <script src="/static/event-config.js"></script>
   <script src="/static/akamai-sensor.js"></script>
   <script src="/static/telemetry.js"></script>
-  <script src="/static/ttm-ui.js"></script>
+  <script src="/static/Ticket-ui.js"></script>
 </head>
 <body>
-  <header class="ttm-header">
-    <div class="ttm-logo">
-      <div class="ttm-logo-main">
-        <span class="ttm-logo-badge">TTM</span>
+  <header class="Ticket-header">
+    <div class="ticket-logo">
+      <div class="ticket-logo-main">
+        <span class="ticket-logo-badge">Ticket</span>
         <span>THAITICKET MAJOR</span>
       </div>
-      <span class="ttm-logo-sub">a ticketmaster company</span>
+      <span class="ticket-logo-sub">a ticketmaster company</span>
     </div>
   </header>
 
-  <main class="ttm-main">
+  <main class="Ticket-main">
     <span id="demo-badge" class="demo-badge hidden">Demo Mode — ?demo=1</span>
 
     <section id="phase-too-early" class="hidden">
-      <h1 class="ttm-event-title event-title"></h1>
+      <h1 class="Ticket-event-title event-title"></h1>
       <div class="early-banner" id="early-message"></div>
-      <p class="ttm-copy">ระบบจะเปิดให้เข้าห้องรอก่อนเวลาขายจริง 30 นาที</p>
+      <p class="Ticket-copy">ระบบจะเปิดให้เข้าห้องรอก่อนเวลาขายจริง 30 นาที</p>
     </section>
 
     <section id="phase-login" class="hidden">
-      <h1 class="ttm-event-title event-title"></h1>
-      <p class="ttm-copy" id="pre-login-note"></p>
+      <h1 class="Ticket-event-title event-title"></h1>
+      <p class="Ticket-copy" id="pre-login-note"></p>
       <div class="login-card">
         <h2>เข้าสู่ระบบสมาชิก</h2>
         <p>ล็อกอินก่อนเวลาเปิดขายเพื่อเข้าห้องรอ (Defense Layer 1 ตรวจ IP ที่ Gateway)</p>
@@ -59,18 +59,18 @@
               </div>
             </div>
           </div>
-          <button type="submit" class="ttm-btn">เข้าสู่ระบบ</button>
+          <button type="submit" class="ticket-btn">เข้าสู่ระบบ</button>
         </form>
         <p class="login-note">Demo: ใส่อีเมล/รหัสผ่านอะไรก็ได้</p>
       </div>
     </section>
 
     <section id="phase-countdown" class="hidden">
-      <h1 class="ttm-event-title event-title"></h1>
-      <p class="ttm-copy">
+      <h1 class="Ticket-event-title event-title"></h1>
+      <p class="Ticket-copy">
         ยังไม่ถึงเวลาเปิดขาย กรุณารอในหน้านี้ — อย่าปิดหรือรีเฟรชหน้าจอ
       </p>
-      <p class="ttm-start-time">The event will begin at: <strong id="sale-start-label"></strong></p>
+      <p class="Ticket-start-time">The event will begin at: <strong id="sale-start-label"></strong></p>
       <div id="countdown-display" class="countdown-display">-- Minutes -- Seconds</div>
       <div class="status-line">
         <span class="status-dot"></span>
@@ -84,8 +84,8 @@
         You are in the buying queue <strong class="event-title"></strong>.
         Once your buying queue is reached, you will have 10 minutes to complete your purchase.
       </p>
-      <p id="queue-position" class="ttm-copy"></p>
-      <p id="bot-score-label" class="ttm-copy hidden"></p>
+      <p id="queue-position" class="Ticket-copy"></p>
+      <p id="bot-score-label" class="Ticket-copy hidden"></p>
       <div class="progress-wrap">
         <div id="progress-user" class="progress-user" style="left: 0%">
           <div class="progress-user-icon" aria-hidden="true">🚶</div>
@@ -106,8 +106,8 @@
       <p class="queue-subheading">
         Queue Service ออก token แล้ว — คุณมีเวลา 10 นาทีในการเลือกที่นั่งและชำระเงิน
       </p>
-      <p class="event-title ttm-event-title" style="font-size:1rem;"></p>
-      <button id="btn-enter-seats" class="ttm-btn">เลือกที่นั่ง</button>
+      <p class="event-title Ticket-event-title" style="font-size:1rem;"></p>
+      <button id="btn-enter-seats" class="ticket-btn">เลือกที่นั่ง</button>
     </section>
 
     <div id="defense-error" class="alert-banner error hidden"></div>
@@ -117,7 +117,7 @@
     <div class="entry-modal">
       <h2>YOU ARE NOW IN THE ENTRY ZONE</h2>
       <p>The waiting room is now open. Please click to join.</p>
-      <button id="btn-join-queue" class="ttm-btn">Join the Queue</button>
+      <button id="btn-join-queue" class="ticket-btn">Join the Queue</button>
     </div>
   </div>
 
@@ -125,8 +125,8 @@
     <div class="activity-modal">
       <h2>Akamai Bot Manager — Challenge</h2>
       <p>Bot Score สูง — ต้องยืนยันความเป็นมนุษย์ก่อนเข้าคิว priority</p>
-      <p class="ttm-copy">สถานะคุกกี้ <code>_abck</code>: challenged (-1)</p>
-      <button id="btn-akamai-challenge" class="ttm-btn">Complete Challenge</button>
+      <p class="Ticket-copy">สถานะคุกกี้ <code>_abck</code>: challenged (-1)</p>
+      <button id="btn-akamai-challenge" class="ticket-btn">Complete Challenge</button>
     </div>
   </div>
 
@@ -134,7 +134,7 @@
     <div class="activity-modal">
       <h2>Still here?</h2>
       <p>Please confirm you’re still waiting. This won’t affect your place in line.</p>
-      <button id="btn-activity-confirm" class="ttm-btn">Yes, I'm here</button>
+      <button id="btn-activity-confirm" class="ticket-btn">Yes, I'm here</button>
     </div>
   </div>
 
@@ -142,7 +142,7 @@
     <div class="captcha-modal">
       <div class="captcha-header">
         <div class="captcha-header-left">
-          <span class="captcha-header-logo-badge">TTM</span>
+          <span class="captcha-header-logo-badge">Ticket</span>
           <span class="captcha-header-title">ตรวจสอบความปลอดภัย (Security Check)</span>
         </div>
         <div class="captcha-header-right">
@@ -168,7 +168,7 @@
         <div class="slider-track-container">
           <input type="range" min="0" max="100" value="0" class="slider-input" id="slider-input">
         </div>
-        <button id="btn-verify-slider" class="ttm-btn">Verify</button>
+        <button id="btn-verify-slider" class="ticket-btn">Verify</button>
       </div>
 
       <!-- Type 3: Color Match -->
@@ -177,7 +177,7 @@
         <p>For security purposes, please click on the matching color.</p>
         <div class="color-target-box" id="color-target"></div>
         <div class="color-grid" id="color-grid"></div>
-        <button id="btn-verify-color" class="ttm-btn disabled" disabled>Processing...</button>
+        <button id="btn-verify-color" class="ticket-btn disabled" disabled>Processing...</button>
       </div>
 
       <!-- Type 4: Image Sort (Fan) -->
@@ -185,7 +185,7 @@
         <h3>เพื่อความปลอดภัย กรุณาเรียงภาพให้ถูกต้อง</h3>
         <p>ลากและวางชิ้นส่วนภาพจากบนลงล่างให้เป็นภาพที่สมบูรณ์</p>
         <div class="sortable-list" id="sortable-fan"></div>
-        <button id="btn-verify-fan" class="ttm-btn">ยืนยัน / Verify</button>
+        <button id="btn-verify-fan" class="ticket-btn">ยืนยัน / Verify</button>
       </div>
 
       <!-- Type 5: Image Sort (Lyric) -->
@@ -193,7 +193,7 @@
         <h3>เพื่อความปลอดภัย กรุณาเรียงภาพให้ถูกต้อง</h3>
         <p>ลากและวางชิ้นส่วนภาพจากบนลงล่างให้เป็นภาพที่สมบูรณ์</p>
         <div class="sortable-list" id="sortable-lyric"></div>
-        <button id="btn-verify-lyric" class="ttm-btn">ยืนยัน / Verify</button>
+        <button id="btn-verify-lyric" class="ticket-btn">ยืนยัน / Verify</button>
       </div>
 
       <!-- Timer & Footer -->
@@ -206,7 +206,7 @@
     </div>
   </div>
 
-  <footer class="ttm-footer"></footer>
+  <footer class="Ticket-footer"></footer>
   <script src="/static/waiting-room.js"></script>
 </body>
 </html>

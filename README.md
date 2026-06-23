@@ -1,5 +1,5 @@
-# TTM 2026 Concert Ticket Bot
-บอทกดบัตรคอนเสิร์ต ThaiTicketMajor ปี 2026 เวอร์ชัน Production
+# Concert Ticket Bot 2026
+บอทกดบัตรคอนเสิร์ตปี 2026 เวอร์ชัน Production
 **เทคโนโลยีหลัก**: GraphQL + Queue-it Bypass + Auto CAPTCHA Solver (2Captcha) + Docker Swarm + FastAPI Dashboard + TypeScript React
 ---
 ## คุณสมบัติ
@@ -21,7 +21,7 @@
 - **Notification**: Telegram Bot
 ---
 ## โครงสร้างโปรเจกต์
-TTM-BOT-2026/ ├── manager/ # Dashboard + Control Panel ├── worker/ # บอทหลัก (GraphQL Bot) ├── frontend/ # โค้ด React TypeScript ├── docker-compose.yml ├── ansible-deploy.yml ├── README.md └── MANUAL.txt # คู่มือการใช้งานฉบับละเอียด
+ticket-bot-2026/ ├── manager/ # Dashboard + Control Panel ├── worker/ # บอทหลัก (GraphQL Bot) ├── frontend/ # โค้ด React TypeScript ├── docker-compose.yml ├── ansible-deploy.yml ├── README.md └── MANUAL.txt # คู่มือการใช้งานฉบับละเอียด
 
 
 
@@ -37,5 +37,5 @@ TTM-BOT-2026/ ├── manager/ # Dashboard + Control Panel ├── worker/ #
 
 คำเตือน
 บอทนี้มีไว้เพื่อการศึกษาและทดสอบทางเทคนิคเท่านั้น
-การใช้บอทอาจผิดเงื่อนไขการใช้งานของ ThaiTicketMajor
+การใช้บอทอาจผิดเงื่อนไขการใช้งานของเว็บไซต์จำหน่ายบัตร
 ผู้ใช้ต้องรับผิดชอบเองทั้งหมด

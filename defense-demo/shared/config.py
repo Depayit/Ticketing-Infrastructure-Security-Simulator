@@ -22,6 +22,6 @@ QUEUE_JOIN_TTL_SEC = int(os.environ.get("QUEUE_JOIN_TTL_SEC", "1800"))
 SENSOR_SESSION_TTL_SEC = int(os.environ.get("SENSOR_SESSION_TTL_SEC", "3600"))
 EDGE_DDOS_GLOBAL_RPS = int(os.environ.get("EDGE_DDOS_GLOBAL_RPS", "800"))
 
-# Block bot GraphQL/API bypass (ttm-bot workers). Browser funnel uses /api/funnel/* only.
+# Block bot GraphQL/API bypass (Ticket-bot workers). Browser funnel uses /api/funnel/* only.
 GRAPHQL_ENABLED = os.environ.get("GRAPHQL_ENABLED", "false").lower() == "true"
 BOT_BYPASS_BLOCK = os.environ.get("BOT_BYPASS_BLOCK", "true").lower() == "true"

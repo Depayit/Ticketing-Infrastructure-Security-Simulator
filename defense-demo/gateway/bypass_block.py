@@ -2,7 +2,7 @@
 Bot Bypass / Block middleware for the defense-demo gateway.
 
 This is a minimal implementation to make the gateway start and be useful
-for testing the TTM bot's defense_funnel + sensor + telemetry flow.
+for testing the Ticket bot's defense_funnel + sensor + telemetry flow.
 
 When BOT_BYPASS_BLOCK=true (default in config), the middleware is lenient
 on the /api/funnel/* and /api/sensor paths so the bot can exercise the

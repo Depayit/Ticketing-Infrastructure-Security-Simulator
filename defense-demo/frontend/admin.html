@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Defense Admin — Swiss Cheese Audit</title>
-  <link rel="stylesheet" href="/static/ttm.css" />
+  <link rel="stylesheet" href="/static/Ticket.css" />
   <script src="/static/event-config.js"></script>
-  <script src="/static/ttm-ui.js"></script>
+  <script src="/static/Ticket-ui.js"></script>
   <style>
     .admin-wrap { max-width: 1280px; margin: 0 auto; padding: 24px; }
     .admin-toolbar {
@@ -34,7 +34,7 @@
     .stat-card .value { font-size: 28px; font-weight: 800; margin-top: 4px; }
     .stat-card.passed .value { color: var(--success); }
     .stat-card.blocked .value { color: var(--danger); }
-    .stat-card.total .value { color: var(--ttm-blue); }
+    .stat-card.total .value { color: var(--Ticket-blue); }
     .filter-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
     .filter-tabs button {
       padding: 8px 16px;
@@ -45,7 +45,7 @@
       font-weight: 600;
       font-size: 13px;
     }
-    .filter-tabs button.active { background: var(--ttm-blue); color: #fff; border-color: var(--ttm-blue); }
+    .filter-tabs button.active { background: var(--Ticket-blue); color: #fff; border-color: var(--Ticket-blue); }
     .filter-tabs button.tab-pass.active { background: var(--success); border-color: var(--success); }
     .filter-tabs button.tab-fail.active { background: var(--danger); border-color: var(--danger); }
     .btn-clear {
@@ -75,7 +75,7 @@
       padding: 10px 18px;
       border-radius: 8px;
       border: none;
-      background: var(--ttm-blue);
+      background: var(--Ticket-blue);
       color: #fff;
       font-weight: 700;
       cursor: pointer;
@@ -110,7 +110,7 @@
     .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
     .btn-page { padding: 6px 12px; border: 1px solid var(--border-light); border-radius: 6px; background: #fff; cursor: pointer; font-size: 13px; font-weight: 600; }
     .btn-page:hover { background: #f3f4f6; }
-    .btn-page.active { background: var(--ttm-blue); color: #fff; border-color: var(--ttm-blue); }
+    .btn-page.active { background: var(--Ticket-blue); color: #fff; border-color: var(--Ticket-blue); }
     .toggle-wrapper { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb; }
     .toggle-wrapper span { font-size: 13px; font-weight: 600; color: #374151; }
     .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
@@ -134,13 +134,13 @@
   </style>
 </head>
 <body>
-  <header class="ttm-header">
-    <div class="ttm-logo">
-      <div class="ttm-logo-main">
-        <span class="ttm-logo-badge">TTM</span>
+  <header class="Ticket-header">
+    <div class="ticket-logo">
+      <div class="ticket-logo-main">
+        <span class="ticket-logo-badge">Ticket</span>
         <span>DEFENSE ADMIN</span>
       </div>
-      <span class="ttm-logo-sub">Swiss Cheese Model — Live Audit</span>
+      <span class="ticket-logo-sub">Swiss Cheese Model — Live Audit</span>
     </div>
   </header>
 
@@ -150,8 +150,8 @@
       <a href="/seats">Seat Map</a>
       <a href="/checkout">Checkout</a>
     </div>
-    <h1 id="event-name" class="ttm-event-title" style="text-align:left;"></h1>
-    <p class="ttm-copy" style="text-align:left;">Real-time events จาก Edge · IP · Akamai · Queue · AI · 3DS</p>
+    <h1 id="event-name" class="Ticket-event-title" style="text-align:left;"></h1>
+    <p class="Ticket-copy" style="text-align:left;">Real-time events จาก Edge · IP · Akamai · Queue · AI · 3DS</p>
 
     <div class="admin-toolbar">
       <div class="stats-grid">
@@ -209,7 +209,7 @@
         </div>
         <div style="display:flex; justify-content:flex-end; gap:12px;">
           <button type="button" id="btn-close-config" style="padding:8px 16px; border:none; background:#ccc; border-radius:6px; cursor:pointer;">ยกเลิก</button>
-          <button type="button" id="btn-save-config" style="padding:8px 16px; border:none; background:var(--ttm-blue); color:#fff; border-radius:6px; cursor:pointer; font-weight:bold;">บันทึก</button>
+          <button type="button" id="btn-save-config" style="padding:8px 16px; border:none; background:var(--Ticket-blue); color:#fff; border-radius:6px; cursor:pointer; font-weight:bold;">บันทึก</button>
         </div>
       </div>
     </div>
@@ -234,12 +234,12 @@
     <div id="pagination" class="pagination"></div>
   </div>
 
-  <footer class="ttm-footer"></footer>
+  <footer class="Ticket-footer"></footer>
   <div id="toast" class="toast hidden"></div>
   <script>
     TTMUI.renderDefenseFooter(false);
     TTMUI.setPageTitle("Admin");
-    document.getElementById("event-name").textContent = window.TTM_EVENT?.name || "";
+    document.getElementById("event-name").textContent = window.ticket_EVENT?.name || "";
 
     let currentFilter = "all";
     let allEvents = [];

@@ -2,7 +2,7 @@
 
 export type BotMode = 'queueit' | 'defense_demo';
 
-export type SetupTabId = 'basic' | 'telegram' | 'proxies' | 'profiles' | 'browser' | 'ttm';
+export type SetupTabId = 'basic' | 'telegram' | 'proxies' | 'profiles' | 'browser' | 'ticket';
 
 export interface ModeSettingRow {
   name: string;
@@ -28,7 +28,7 @@ export const BOT_MODE_META: Record<
 > = {
   queueit: {
     icon: '🎫',
-    title: 'ThaiTicketMajor / Queue-it',
+    title: 'Ticket Purchase / Queue-it',
     short: 'queueit',
     description: 'คิวจริง → เลือกที่นั่ง → เลือกจ่ายด้วย PromptPay → ส่งรูป QR Code ไป Telegram ทันที',
     accent: 'from-emerald-500/20 to-cyan-500/10',
@@ -47,7 +47,7 @@ export const BOT_MODE_META: Record<
 };
 
 export const MODE_CATEGORIES: { label: string; hint: string; modes: BotMode[] }[] = [
-  { label: 'จองบัตรจริง', hint: 'TTM + Queue-it', modes: ['queueit'] },
+  { label: 'จองบัตรจริง', hint: 'Ticket + Queue-it', modes: ['queueit'] },
   { label: 'ทดสอบระบบ', hint: 'Sandbox', modes: ['defense_demo'] },
 ];
 
@@ -57,13 +57,13 @@ export const SETUP_TAB_LABELS: Record<SetupTabId, string> = {
   proxies: '🌐 Proxies',
   profiles: '👤 Buyers',
   browser: '🛡️ Browser',
-  ttm: '🎫 TTM Purchase',
+  Ticket: '🎫 Ticket Purchase',
 };
 
 export const MODE_GUIDE: Record<BotMode, ModeGuideEntry> = {
   queueit: {
     icon: '🎫',
-    title: 'ThaiTicketMajor / Queue-it',
+    title: 'Ticket Purchase / Queue-it',
     short: 'queueit',
     badge: 'โปรดักชัน',
     summary:
@@ -77,15 +77,15 @@ export const MODE_GUIDE: Record<BotMode, ModeGuideEntry> = {
       'ถ้า stop_on_first: หยุด worker ทุกตัวเมื่อตัวแรกสำเร็จ',
     ],
     settings: [
-      { name: 'Target URL', tab: 'basic', required: true, description: 'ลิงก์หน้าคอนเสิร์ตหรือหน้าเริ่มคิวบน thaiticketmajor.com' },
+      { name: 'Target URL', tab: 'basic', required: true, description: 'ลิงก์หน้าคอนเสิร์ตหรือหน้าเริ่มคิวบน Ticket Platform.com' },
       { name: 'Event ID', tab: 'basic', required: false, description: 'ใช้อ้างอิง / log (ไม่บังคับ)' },
-      { name: 'Ticket Priorities', tab: 'ttm', required: false, description: 'ลำดับการเลือกโซน/ราคา (เช่น VIP > GA) ให้ AI ช่วยวิเคราะห์' },
-      { name: 'Hold (วินาที)', tab: 'ttm', required: true, description: 'เวลาคงเบราว์เซอร์ไว้ให้คุณเข้าจ่าย (ค่าเริ่มต้น 600 = 10 นาที)' },
-      { name: 'Timeout (นาที)', tab: 'ttm', required: true, description: 'หมดเวลาแล้ว worker จะออกจาก flow' },
-      { name: 'Stop เมื่อได้ที่นั่ง', tab: 'ttm', required: false, description: 'เปิด = หยุดทุก worker เมื่อตัวใดตัวหนึ่ง hold สำเร็จ' },
-      { name: 'Headless', tab: 'ttm', required: false, description: 'รันเบราว์เซอร์แบบไม่มี UI (แนะนำเปิดบน server)' },
-      { name: 'Selectors (จอง/ที่นั่ง/ตะกร้า)', tab: 'ttm', required: false, description: 'ปรับเมื่อ TTM เปลี่ยน DOM — อยู่ใน Advanced' },
-      { name: 'Join Queue / Still here? texts', tab: 'ttm', required: false, description: 'ข้อความปุ่มในห้องรอ Queue-it' },
+      { name: 'Ticket Priorities', tab: 'ticket', required: false, description: 'ลำดับการเลือกโซน/ราคา (เช่น VIP > GA) ให้ AI ช่วยวิเคราะห์' },
+      { name: 'Hold (วินาที)', tab: 'ticket', required: true, description: 'เวลาคงเบราว์เซอร์ไว้ให้คุณเข้าจ่าย (ค่าเริ่มต้น 600 = 10 นาที)' },
+      { name: 'Timeout (นาที)', tab: 'ticket', required: true, description: 'หมดเวลาแล้ว worker จะออกจาก flow' },
+      { name: 'Stop เมื่อได้ที่นั่ง', tab: 'ticket', required: false, description: 'เปิด = หยุดทุก worker เมื่อตัวใดตัวหนึ่ง hold สำเร็จ' },
+      { name: 'Headless', tab: 'ticket', required: false, description: 'รันเบราว์เซอร์แบบไม่มี UI (แนะนำเปิดบน server)' },
+      { name: 'Selectors (จอง/ที่นั่ง/ตะกร้า)', tab: 'ticket', required: false, description: 'ปรับเมื่อ Ticket เปลี่ยน DOM — อยู่ใน Advanced' },
+      { name: 'Join Queue / Still here? texts', tab: 'ticket', required: false, description: 'ข้อความปุ่มในห้องรอ Queue-it' },
       { name: 'Proxies', tab: 'proxies', required: true, description: 'Residential ไทย — แนะนำ 1 proxy ต่อ 1–2 worker' },
       { name: 'Browser Profiles', tab: 'browser', required: true, description: 'Fingerprint ต่อ proxy — ควรมีจำนวน ≥ proxy ที่ใช้งาน' },
       { name: 'Bot Token + Chat ID', tab: 'telegram', required: true, description: 'ส่งภาพ QR Code และลิงก์ชำระเงินเมื่อ hold สำเร็จ (ต้องไม่ใช่ placeholder)' },
@@ -100,7 +100,7 @@ export const MODE_GUIDE: Record<BotMode, ModeGuideEntry> = {
     short: 'defense_demo',
     badge: 'ทดสอบ',
     summary:
-      'จำลอง funnel ห้องรอ / anti-bot ใน defense-gateway ก่อนลงงาน TTM จริง — ใช้ทดสอบ stealth, proxy และการตอบ Still here?',
+      'จำลอง funnel ห้องรอ / anti-bot ใน defense-gateway ก่อนลงงาน Ticket จริง — ใช้ทดสอบ stealth, proxy และการตอบ Still here?',
     flow: [
       'เปิด Sandbox URL (defense-gateway)',
       'ผ่าน Akamai Challenge (ติ๊กช่อง / Complete Challenge)',
@@ -110,11 +110,11 @@ export const MODE_GUIDE: Record<BotMode, ModeGuideEntry> = {
     ],
     settings: [
       { name: 'Target URL', tab: 'basic', required: false, description: 'ถ้าว่าง ใช้ defense_demo.default_url' },
-      { name: 'Default URL (fallback)', tab: 'ttm', required: true, description: 'เช่น http://defense-gateway:8090/?demo=1' },
-      { name: 'Max poll attempts', tab: 'ttm', required: true, description: 'จำนวนครั้งสูงสุดที่ poll ห้องรอ' },
-      { name: 'Poll interval (min–max วินาที)', tab: 'ttm', required: true, description: 'ช่วงหน่วงระหว่างแต่ละ poll' },
-      { name: 'Sandbox login email/password', tab: 'ttm', required: false, description: 'ว่าง = ใช้ buyer profile แรก' },
-      { name: 'Queue-it Hold / Timeout', tab: 'ttm', required: false, description: 'ใช้ค่า queueit เดียวกับโหมด TTM (hold_seconds, max_minutes)' },
+      { name: 'Default URL (fallback)', tab: 'ticket', required: true, description: 'เช่น http://defense-gateway:8090/?demo=1' },
+      { name: 'Max poll attempts', tab: 'ticket', required: true, description: 'จำนวนครั้งสูงสุดที่ poll ห้องรอ' },
+      { name: 'Poll interval (min–max วินาที)', tab: 'ticket', required: true, description: 'ช่วงหน่วงระหว่างแต่ละ poll' },
+      { name: 'Sandbox login email/password', tab: 'ticket', required: false, description: 'ว่าง = ใช้ buyer profile แรก' },
+      { name: 'Queue-it Hold / Timeout', tab: 'ticket', required: false, description: 'ใช้ค่า queueit เดียวกับโหมด Ticket (hold_seconds, max_minutes)' },
       { name: 'Proxies + Browser Profiles', tab: 'proxies', required: false, description: 'แนะนำเหมือนโหมดจริงเพื่อทดสอบ fingerprint' },
       { name: 'Telegram', tab: 'telegram', required: false, description: 'แจ้งเตือนเมื่อทดสอบสำเร็จ (ถ้าตั้ง token)' },
     ],
@@ -124,7 +124,7 @@ export const MODE_GUIDE: Record<BotMode, ModeGuideEntry> = {
 
 export function normalizeBotMode(raw: string | undefined): BotMode {
   if (raw === 'defense_demo') return raw;
-  if (raw === 'ttm') return 'queueit';
+  if (raw === 'ticket') return 'queueit';
   return 'queueit';
 }
 

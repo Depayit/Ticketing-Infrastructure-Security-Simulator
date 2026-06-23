@@ -3,14 +3,14 @@ import React from 'react';
 const Manual: React.FC = () => {
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 sm:p-8 max-w-4xl mx-auto text-zinc-300">
-      <h1 className="text-2xl font-bold text-white mb-2">คู่มือการใช้งานบอทกดบัตร ThaiTicketMajor 2026 (Production Version)</h1>
+      <h1 className="text-2xl font-bold text-white mb-2">คู่มือการใช้งานบอทกดบัตร Ticket Platform 2026 (Production Version)</h1>
       <p className="text-sm text-zinc-500 mb-8">วันที่สร้าง: 24 พฤษภาคม 2026 | เวอร์ชัน: 2.0 (Manager/Worker + Dashboard + GraphQL + Auto CAPTCHA)</p>
 
       <section className="mb-8">
         <h2 className="text-xl font-semibold text-emerald-400 mb-4 border-b border-zinc-800 pb-2">1. คำเตือนสำคัญ</h2>
         <ul className="list-disc pl-5 space-y-2">
           <li>บอทนี้ใช้สำหรับการศึกษาระบบอัตโนมัติและการพัฒนาเท่านั้น</li>
-          <li>การใช้บอทอาจผิดเงื่อนไขการใช้งานของ ThaiTicketMajor</li>
+          <li>การใช้บอทอาจผิดเงื่อนไขการใช้งานของ Ticket Platform</li>
           <li>ผู้ใช้งานต้องรับผิดชอบเองทั้งหมด</li>
           <li>ควรใช้ Residential Proxy ไทยคุณภาพสูงเท่านั้น</li>
           <li>แนะนำให้ทดสอบกับ event เล็ก ๆ ก่อน</li>
@@ -33,7 +33,7 @@ const Manual: React.FC = () => {
       <section className="mb-8">
         <h2 className="text-xl font-semibold text-emerald-400 mb-4 border-b border-zinc-800 pb-2">3. โครงสร้างโฟลเดอร์</h2>
         <pre className="bg-zinc-950 p-4 rounded-lg overflow-x-auto text-sm text-emerald-300 border border-zinc-800">
-{`TTM-BOT-2026/
+{`ticket-bot-2026/
 ├── manager/
 │   ├── main.py
 │   ├── config.json
@@ -69,7 +69,7 @@ const Manual: React.FC = () => {
             <p className="mb-2 font-medium">worker/config.json</p>
             <pre className="bg-zinc-950 p-4 rounded-lg overflow-x-auto text-sm text-emerald-300 border border-zinc-800 mb-4">
 {`{
-  "event_id": "ttm-bkk-blackpink-world-tour-2026",
+  "event_id": "Ticket-bkk-blackpink-world-tour-2026",
   "telegram_token": "YOUR_TELEGRAM_BOT_TOKEN",
   "telegram_chat_id": "YOUR_CHAT_ID",
   "captcha_key": "YOUR_2CAPTCHA_KEY",
@@ -92,11 +92,11 @@ const Manual: React.FC = () => {
           <div>
             <h3 className="text-lg font-medium text-white mb-2">ขั้นตอนที่ 3: รันด้วย Docker</h3>
             <pre className="bg-zinc-950 p-4 rounded-lg overflow-x-auto text-sm text-emerald-300 border border-zinc-800">
-{`cd TTM-BOT-2026
+{`cd ticket-bot-2026
 docker compose up -d --build
 
 # หรือใช้ Swarm:
-docker stack deploy -c docker-compose.yml ttm-bot`}
+docker stack deploy -c docker-compose.yml Ticket-bot`}
             </pre>
           </div>
         </div>
@@ -154,7 +154,7 @@ docker stack deploy -c docker-compose.yml ttm-bot`}
       <section className="mb-8">
         <h2 className="text-xl font-semibold text-emerald-400 mb-4 border-b border-zinc-800 pb-2">8. การอัปเดต & คำแนะนำเพิ่มเติม</h2>
         <ul className="list-disc pl-5 space-y-2">
-          <li>Endpoint และ Mutation ของ ThaiTicketMajor เปลี่ยนบ่อย</li>
+          <li>Endpoint และ Mutation ของ Ticket Platform เปลี่ยนบ่อย</li>
           <li>ควร capture GraphQL จาก Chrome DevTools ทุกครั้งก่อน event ใหญ่</li>
           <li>อัปเดต User-Agent และ Header ให้ตรงกับปี 2026</li>
           <li>รันบนเครื่องที่มีความเร็วอินเทอร์เน็ตสูงและ latency ต่ำ</li>

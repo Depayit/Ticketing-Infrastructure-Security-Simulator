@@ -36,7 +36,7 @@
 
   function purchaseDeadlineMs() {
     const issued = parseFloat(localStorage.getItem("defense_token_issued_at") || "0");
-    const limitMin = window.TTM_EVENT?.purchaseLimitMinutes || 10;
+    const limitMin = window.ticket_EVENT?.purchaseLimitMinutes || 10;
     if (!issued) return null;
     return issued * 1000 + limitMin * 60 * 1000;
   }

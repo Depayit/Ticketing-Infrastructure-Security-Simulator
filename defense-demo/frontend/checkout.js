@@ -147,7 +147,7 @@
     localStorage.removeItem("defense_selected_seat");
     localStorage.removeItem("defense_quantity");
     localStorage.removeItem("defense_show_date");
-    sessionStorage.removeItem("ttm_waiting_room_state");
+    sessionStorage.removeItem("ticket_waiting_room_state");
     
     alert("การชำระเงินเสร็จสิ้น! ระบบจะนำคุณกลับไปหน้าห้องล็อกอิน");
     location.href = "/";

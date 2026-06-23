@@ -7,9 +7,9 @@
 }
 
 :root {
-  --ttm-red: #dc2626;
-  --ttm-blue: #dc2626;
-  --ttm-blue-hover: #b91c1c;
+  --Ticket-red: #dc2626;
+  --Ticket-blue: #dc2626;
+  --Ticket-blue-hover: #b91c1c;
   --text-primary: #1e293b;
   --text-secondary: #475569;
   --text-muted: #64748b;
@@ -35,7 +35,7 @@ body {
   display: none !important;
 }
 
-.ttm-header {
+.Ticket-header {
   background: #ffffff;
   padding: 20px 16px;
   text-align: center;
@@ -43,14 +43,14 @@ body {
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 
-.ttm-logo {
+.ticket-logo {
   display: inline-flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
 }
 
-.ttm-logo-main {
+.ticket-logo-main {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -60,8 +60,8 @@ body {
   letter-spacing: 0.04em;
 }
 
-.ttm-logo-badge {
-  background: var(--ttm-red);
+.ticket-logo-badge {
+  background: var(--Ticket-red);
   color: #ffffff;
   font-size: 0.75rem;
   font-weight: 900;
@@ -69,12 +69,12 @@ body {
   border-radius: 2px;
 }
 
-.ttm-logo-sub {
+.ticket-logo-sub {
   color: #64748b;
   font-size: 0.72rem;
 }
 
-.ttm-main {
+.Ticket-main {
   max-width: 820px;
   margin: 40px auto;
   padding: 36px 24px 88px;
@@ -85,11 +85,11 @@ body {
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
 }
 
-.ttm-main-left {
+.Ticket-main-left {
   text-align: left;
 }
 
-.ttm-event-title {
+.Ticket-event-title {
   font-size: clamp(1.1rem, 2.5vw, 1.45rem);
   font-weight: 700;
   line-height: 1.35;
@@ -97,14 +97,14 @@ body {
   text-transform: uppercase;
 }
 
-.ttm-copy {
+.Ticket-copy {
   color: var(--text-secondary);
   font-size: 0.95rem;
   line-height: 1.65;
   margin: 0 0 16px;
 }
 
-.ttm-start-time {
+.Ticket-start-time {
   font-size: 0.95rem;
   margin: 0 0 28px;
 }
@@ -112,7 +112,7 @@ body {
 .countdown-display {
   font-size: clamp(2rem, 6vw, 3rem);
   font-weight: 700;
-  color: var(--ttm-red);
+  color: var(--Ticket-red);
   margin: 8px 0 24px;
 }
 
@@ -186,7 +186,7 @@ body {
 .progress-user-icon {
   width: 28px;
   height: 28px;
-  background: var(--ttm-red);
+  background: var(--Ticket-red);
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -199,11 +199,11 @@ body {
 .progress-user-tail {
   width: 2px;
   height: 10px;
-  background: var(--ttm-red);
+  background: var(--Ticket-red);
   margin-top: 2px;
 }
 
-.ttm-btn {
+.ticket-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -211,7 +211,7 @@ body {
   padding: 12px 28px;
   border: none;
   border-radius: 24px;
-  background: var(--ttm-blue);
+  background: var(--Ticket-blue);
   color: #fff;
   font-size: 1rem;
   font-weight: 600;
@@ -221,23 +221,23 @@ body {
   box-shadow: 0 4px 12px rgba(220, 38, 38, 0.25);
 }
 
-.ttm-btn:hover:not(:disabled) {
-  background: var(--ttm-blue-hover);
+.ticket-btn:hover:not(:disabled) {
+  background: var(--Ticket-blue-hover);
   transform: translateY(-1px);
   box-shadow: 0 6px 16px rgba(220, 38, 38, 0.35);
 }
 
-.ttm-btn:active:not(:disabled) {
+.ticket-btn:active:not(:disabled) {
   transform: translateY(0);
 }
 
-.ttm-btn:disabled {
+.ticket-btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
   box-shadow: none;
 }
 
-.ttm-btn-danger {
+.ticket-btn-danger {
   background: var(--danger);
 }
 
@@ -279,12 +279,12 @@ body {
 
 .form-group input:focus {
   outline: none;
-  border-color: var(--ttm-red);
+  border-color: var(--Ticket-red);
   box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.15);
 }
 
-.login-card .ttm-btn,
-.panel-card .ttm-btn {
+.login-card .ticket-btn,
+.panel-card .ticket-btn {
   width: 100%;
 }
 
@@ -331,7 +331,7 @@ body {
   z-index: 2000;
 }
 
-.ttm-footer {
+.Ticket-footer {
   position: fixed;
   left: 0;
   right: 0;
@@ -468,7 +468,7 @@ body {
 
 .seat.selected {
   outline: 4px solid #fff;
-  box-shadow: 0 0 0 6px var(--ttm-blue);
+  box-shadow: 0 0 0 6px var(--Ticket-blue);
   transform: scale(1.02);
 }
 
@@ -517,12 +517,12 @@ body {
 }
 
 .nav-links a {
-  color: var(--ttm-blue);
+  color: var(--Ticket-blue);
   font-size: 0.9rem;
 }
 
 @media (max-width: 640px) {
-  .ttm-main {
+  .Ticket-main {
     padding: 24px 16px 80px;
   }
 
@@ -702,7 +702,7 @@ body {
   width: 24px;
   height: 24px;
   cursor: pointer;
-  accent-color: var(--ttm-red);
+  accent-color: var(--Ticket-red);
   border: 2px solid #c1c1c1;
   border-radius: 2px;
   transition: transform 0.1s ease;

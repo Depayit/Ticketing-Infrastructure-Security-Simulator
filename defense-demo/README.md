@@ -1,6 +1,6 @@
-﻿# TTM Defense Demo — Swiss Cheese + Akamai Simulation
+# Ticket Defense Demo — Swiss Cheese + Akamai Simulation
 
-Mock ticketing platform demonstrating **Edge/CDN**, **Queue-it priority queue**, **Akamai Bot Manager** (sensor + cookies + bot score), **AI fraud**, and **3DS** against `ttm-bot-2026`.
+Mock ticketing platform demonstrating **Edge/CDN**, **Queue-it priority queue**, **Akamai Bot Manager** (sensor + cookies + bot score), **AI fraud**, and **3DS** against `Ticket-bot-2026`.
 
 ## Quick Start (Docker)
 
@@ -11,7 +11,7 @@ docker compose -f docker-compose.defense.yml up --build
 
 | URL | หน้า | Defense Layer |
 |-----|------|---------------|
-| http://localhost:8090/ | Waiting Room (TTM UI) | Edge + WAF + Akamai + Queue-it |
+| http://localhost:8090/ | Waiting Room (Ticket UI) | Edge + WAF + Akamai + Queue-it |
 | http://localhost:8090/?demo=1 | Demo เร็ว (~8s countdown) | ทั้งหมด |
 | http://localhost:8090/seats | เลือกที่นั่ง | AI (Telemetry → Fraud Engine) |
 | http://localhost:8090/checkout | ชำระเงิน + 3DS | Payment/3DS |
@@ -19,7 +19,7 @@ docker compose -f docker-compose.defense.yml up --build
 
 **Event:** 2026-27 JACOB WORLD TOUR IN BANGKOK (`demo-concert-2026`)
 
-## Defense Stack (สเปกจำลอง TTM)
+## Defense Stack (สเปกจำลอง Ticket)
 
 ### Edge & Network Layer
 - **CDN headers**: `X-CDN-Edge`, `X-Cache-Status`, `X-AZ-Zone` (Multi-AZ: `az-bkk-1/2/3`)
@@ -62,7 +62,7 @@ POST /api/challenge/pass
 Headers: x-session-id: <uuid>
 ```
 
-## Red Team (ttm-bot)
+## Red Team (Ticket-bot)
 
 ```json
 {
@@ -78,7 +78,7 @@ Headers: x-session-id: <uuid>
 | Variable | Default | ความหมาย |
 |----------|---------|----------|
 | `GRAPHQL_ENABLED` | `false` | ปิด `/graphql/v2` — บอทยิง GraphQL ข้ามคิวไม่ได้ |
-| `BOT_BYPASS_BLOCK` | `true` | บล็อก API ที่มี header บอท (`apollographql-client-name`, `x-ttm-version`) และ API ที่ไม่มี sensor session |
+| `BOT_BYPASS_BLOCK` | `true` | บล็อก API ที่มี header บอท (`apollographql-client-name`, `x-Ticket-version`) และ API ที่ไม่มี sensor session |
 
 เบราว์เซอร์จริงใช้ `/api/funnel/*` หลังส่ง Akamai sensor แล้วเท่านั้น
 

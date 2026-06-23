@@ -10,7 +10,7 @@ import uvicorn
 import json
 from datetime import datetime
 
-app = FastAPI(title="TTM 2026 Bot Dashboard")
+app = FastAPI(title="Ticket Bot 2026 Dashboard")
 REDIS_URL = "redis://redis:6379/0"
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -56,7 +56,7 @@ class LocalRedis:
             self.data.pop(key, None)
 
     def lrange(self, key: str, start: int, end: int):
-        if key != "ttm:logs":
+        if key != "ticket:logs":
             return []
         items = list(self.logs)
         return items[start:end + 1]
@@ -142,13 +142,13 @@ class RedisGateway:
             return
 
         try:
-            existing = self.client.lrange("ttm:logs", 0, 99)
+            existing = self.client.lrange("ticket:logs", 0, 99)
             logs = list(existing)
             logs.append(message)
-            self.client.delete("ttm:logs")
+            self.client.delete("ticket:logs")
             if logs:
                 for log in reversed(logs[-100:]):
-                    self.client.lpush("ttm:logs", log)
+                    self.client.lpush("ticket:logs", log)
         except Exception:
             self.use_local = True
             self.local.append_log(message)
@@ -157,7 +157,7 @@ class RedisGateway:
         if self.use_local:
             return self.local.get_config()
         try:
-            config_str = self.client.get("ttm:config")
+            config_str = self.client.get("ticket:config")
             if config_str:
                 return json.loads(config_str)
             return self.local.get_config()
@@ -171,7 +171,7 @@ class RedisGateway:
             return
 
         try:
-            self.client.set("ttm:config", json.dumps(config))
+            self.client.set("ticket:config", json.dumps(config))
             self.local.set_config(config)
         except Exception:
             self.use_local = True
@@ -220,15 +220,15 @@ async def get_status():
             })
             
     active_workers = len(workers_list)
-    success_count = int(redis_store.get("ttm:success_count") or 0)
-    global_stop = redis_store.get("ttm:global_stop") == "1"
-    is_running = redis_store.get("ttm:running") == "1"
-    live_logs = redis_store.lrange("ttm:logs", 0, 80)
+    success_count = int(redis_store.get("ticket:success_count") or 0)
+    global_stop = redis_store.get("ticket:global_stop") == "1"
+    is_running = redis_store.get("ticket:running") == "1"
+    live_logs = redis_store.lrange("ticket:logs", 0, 80)
     
     try:
-        active_proxies = int(redis_store._call("scard", "ttm:proxies:active") or 0)
-        dead_proxies = int(redis_store._call("scard", "ttm:proxies:dead") or 0)
-        total_proxies = int(redis_store._call("scard", "ttm:proxies:raw") or 0)
+        active_proxies = int(redis_store._call("scard", "ticket:proxies:active") or 0)
+        dead_proxies = int(redis_store._call("scard", "ticket:proxies:dead") or 0)
+        total_proxies = int(redis_store._call("scard", "ticket:proxies:raw") or 0)
     except Exception:
         active_proxies = 0
         dead_proxies = 0
@@ -312,22 +312,22 @@ async def ai_chat(request: Request):
             })
             
     try:
-        active_proxies = int(redis_store._call("scard", "ttm:proxies:active") or 0)
-        dead_proxies = int(redis_store._call("scard", "ttm:proxies:dead") or 0)
+        active_proxies = int(redis_store._call("scard", "ticket:proxies:active") or 0)
+        dead_proxies = int(redis_store._call("scard", "ticket:proxies:dead") or 0)
     except Exception:
         active_proxies = 0
         dead_proxies = 0
 
     global_status = {
-        "is_running": redis_store.get("ttm:running") == "1",
-        "global_stop": redis_store.get("ttm:global_stop") == "1",
-        "success_count": int(redis_store.get("ttm:success_count") or 0),
-        "live_logs": redis_store.lrange("ttm:logs", 0, 15),
+        "is_running": redis_store.get("ticket:running") == "1",
+        "global_stop": redis_store.get("ticket:global_stop") == "1",
+        "success_count": int(redis_store.get("ticket:success_count") or 0),
+        "live_logs": redis_store.lrange("ticket:logs", 0, 15),
         "active_proxies": active_proxies,
         "dead_proxies": dead_proxies
     }
     
-    system_prompt = f"""You are the Antigravity TTM Orchestrator & AI Assistant. You help the user monitor the ticket booking bot system, diagnose issues, and execute commands using natural language.
+    system_prompt = f"""You are the Ticket Bot Orchestrator & AI Assistant. You help the user monitor the ticket booking bot system, diagnose issues, and execute commands using natural language.
 You have access to the current system configuration, worker status, global metrics, and proxy health.
 
 CRITICAL CAPABILITY: YOU ABSOLUTELY CAN CAPTURE SCREENSHOTS AND SEND TELEGRAM BROADCASTS!
@@ -457,12 +457,12 @@ Guidelines:
                         if target:
                             import time as time_mod
                             req_id = f"snap_{int(time_mod.time())}"
-                            redis_store.set(f"ttm:cmd:screenshot:{target}", req_id, ex=30)
+                            redis_store.set(f"ticket:cmd:screenshot:{target}", req_id, ex=30)
                             executed_actions.append(f"Requested screenshot from {target}")
                             
                             for _ in range(30):
                                 await asyncio.sleep(0.5)
-                                if redis_store.get(f"ttm:screenshot:{req_id}"):
+                                if redis_store.get(f"ticket:screenshot:{req_id}"):
                                     response_text += f"\n\n📸 (ระบบได้แนบรูปภาพหน้าจอล่าสุดของ {target} มาให้แล้วด้านล่างนี้ครับ)"
                                     image_url_out = f"/api/screenshot/{req_id}"
                                     break
@@ -484,32 +484,32 @@ Guidelines:
 
 @app.post("/api/start")
 async def start_all():
-    redis_store.delete("ttm:global_stop")
-    redis_store.set("ttm:command", "start")
-    redis_store.set("ttm:running", "1")
+    redis_store.delete("ticket:global_stop")
+    redis_store.set("ticket:command", "start")
+    redis_store.set("ticket:running", "1")
     redis_store.append_log(f"[{datetime.now().strftime('%H:%M:%S')}] Dashboard: ▶ START — workers กำลังทำงาน")
     return {"status": "success", "message": "All workers started"}
 
 
 @app.post("/api/stop")
 async def stop_all():
-    redis_store.set("ttm:global_stop", "1", ex=7200)
-    redis_store.set("ttm:command", "stop")
-    redis_store.delete("ttm:running")
+    redis_store.set("ticket:global_stop", "1", ex=7200)
+    redis_store.set("ticket:command", "stop")
+    redis_store.delete("ticket:running")
     redis_store.append_log(f"[{datetime.now().strftime('%H:%M:%S')}] Dashboard: ⏹ STOP — workers หยุดทำงานแล้ว")
     return {"status": "success", "message": "All workers stopped"}
 
 
 @app.post("/api/worker/{instance_id}/start")
 async def start_worker(instance_id: str):
-    redis_store.delete(f"ttm:stop:{instance_id}")
+    redis_store.delete(f"ticket:stop:{instance_id}")
     redis_store.append_log(f"[{datetime.now().strftime('%H:%M:%S')}] Dashboard: ▶ START WORKER {instance_id}")
     return {"status": "success", "message": f"Worker {instance_id} started"}
 
 
 @app.post("/api/worker/{instance_id}/stop")
 async def stop_worker(instance_id: str):
-    redis_store.set(f"ttm:stop:{instance_id}", "1")
+    redis_store.set(f"ticket:stop:{instance_id}", "1")
     redis_store.append_log(f"[{datetime.now().strftime('%H:%M:%S')}] Dashboard: ⏹ STOP WORKER {instance_id}")
     return {"status": "success", "message": f"Worker {instance_id} stopped"}
 
@@ -542,7 +542,7 @@ async def set_config(request: Request):
 @app.get("/api/telegram/status")
 async def get_telegram_status():
     try:
-        raw = redis_store.get("ttm:telegram_bot_statuses")
+        raw = redis_store.get("ticket:telegram_bot_statuses")
         if raw:
             return json.loads(raw)
     except Exception:
@@ -562,7 +562,7 @@ async def test_telegram_bot(request: Request):
         bot = telegram.Bot(token=token)
         await bot.send_message(
             chat_id=chat_id,
-            text=f"🔔 <b>Test Notification</b>\nThis bot connection is working correctly!\nSent from TTM Bot Dashboard at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+            text=f"🔔 <b>Test Notification</b>\nThis bot connection is working correctly!\nSent from Ticket Bot Dashboard at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
             parse_mode="HTML"
         )
         return {"status": "success", "message": "Test message sent successfully"}
@@ -575,7 +575,7 @@ async def websocket_logs(websocket: WebSocket):
     await websocket.accept()
     try:
         while True:
-            logs = redis_store.lrange("ttm:logs", 0, 50)
+            logs = redis_store.lrange("ticket:logs", 0, 50)
             try:
                 await websocket.send_json({"logs": logs, "timestamp": datetime.now().isoformat()})
             except Exception:
@@ -589,7 +589,7 @@ async def websocket_logs(websocket: WebSocket):
 async def get_screenshot(req_id: str):
     import base64
     from fastapi.responses import Response
-    b64_data = redis_store.get(f"ttm:screenshot:{req_id}")
+    b64_data = redis_store.get(f"ticket:screenshot:{req_id}")
     if b64_data:
         try:
             image_bytes = base64.b64decode(b64_data)
@@ -601,19 +601,19 @@ async def get_screenshot(req_id: str):
 
 @app.post("/api/live/{instance_id}/start")
 async def start_live_stream(instance_id: str):
-    redis_store.set(f"ttm:live_stream:{instance_id}", "1", ex=30)
+    redis_store.set(f"ticket:live_stream:{instance_id}", "1", ex=30)
     return {"status": "success"}
 
 @app.post("/api/live/{instance_id}/stop")
 async def stop_live_stream(instance_id: str):
-    redis_store.delete(f"ttm:live_stream:{instance_id}")
+    redis_store.delete(f"ticket:live_stream:{instance_id}")
     return {"status": "success"}
 
 @app.post("/api/live/{instance_id}/control")
 async def live_control(instance_id: str, request: Request):
     try:
         data = await request.json()
-        redis_store._call("publish", f"ttm:control:{instance_id}", json.dumps(data))
+        redis_store._call("publish", f"ticket:control:{instance_id}", json.dumps(data))
         return {"status": "success"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -626,7 +626,7 @@ async def get_live_stream(instance_id: str):
     
     async def generate():
         while True:
-            b64_data = redis_store.get(f"ttm:live_frame:{instance_id}")
+            b64_data = redis_store.get(f"ticket:live_frame:{instance_id}")
             if b64_data:
                 try:
                     image_bytes = base64.b64decode(b64_data)

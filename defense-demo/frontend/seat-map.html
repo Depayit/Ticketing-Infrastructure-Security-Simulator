@@ -4,23 +4,23 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ThaiTicket Major — Seat Selection</title>
-  <link rel="stylesheet" href="/static/ttm.css" />
+  <link rel="stylesheet" href="/static/Ticket.css" />
   <script src="/static/telemetry.js"></script>
   <script src="/static/funnel-guard.js"></script>
-  <script src="/static/ttm-ui.js"></script>
+  <script src="/static/Ticket-ui.js"></script>
 </head>
 <body>
-  <header class="ttm-header">
-    <div class="ttm-logo">
-      <div class="ttm-logo-main">
-        <span class="ttm-logo-badge">TTM</span>
+  <header class="Ticket-header">
+    <div class="ticket-logo">
+      <div class="ticket-logo-main">
+        <span class="ticket-logo-badge">Ticket</span>
         <span>THAITICKET MAJOR</span>
       </div>
-      <span class="ttm-logo-sub">a ticketmaster company</span>
+      <span class="ticket-logo-sub">a ticketmaster company</span>
     </div>
   </header>
 
-  <main class="ttm-main ttm-main-left" style="max-width: 1100px;">
+  <main class="Ticket-main Ticket-main-left" style="max-width: 1100px;">
     <div class="nav-links">
       <a href="/">← ห้องรอ</a>
       <a href="/admin">Defense Admin</a>
@@ -28,8 +28,8 @@
 
     <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px;">
       <div>
-        <h1 class="ttm-event-title" id="event-name" style="margin-bottom: 8px;"></h1>
-        <p class="ttm-copy" style="margin: 0;">สนามกีฬาแห่งชาติราชมงคล</p>
+        <h1 class="Ticket-event-title" id="event-name" style="margin-bottom: 8px;"></h1>
+        <p class="Ticket-copy" style="margin: 0;">สนามกีฬาแห่งชาติราชมงคล</p>
       </div>
       <p id="purchase-timer" class="purchase-timer" style="font-size: 1.2rem; background: #fff3cd; padding: 6px 12px; border-radius: 6px;"></p>
     </div>
@@ -82,14 +82,14 @@
           </select>
         </div>
 
-        <p id="status-msg" class="ttm-copy" style="font-weight: 600; color: #b91c1c; margin-top: 16px;"></p>
-        <button id="btn-checkout" class="ttm-btn" style="width: 100%; padding: 14px; font-size: 1.1rem; margin-top: 10px;" disabled>ยืนยันและไปชำระเงิน</button>
+        <p id="status-msg" class="Ticket-copy" style="font-weight: 600; color: #b91c1c; margin-top: 16px;"></p>
+        <button id="btn-checkout" class="ticket-btn" style="width: 100%; padding: 14px; font-size: 1.1rem; margin-top: 10px;" disabled>ยืนยันและไปชำระเงิน</button>
       </div>
 
     </div>
   </main>
 
-  <footer class="ttm-footer"></footer>
+  <footer class="Ticket-footer"></footer>
   <script src="/static/seat-map.js"></script>
 </body>
 </html>

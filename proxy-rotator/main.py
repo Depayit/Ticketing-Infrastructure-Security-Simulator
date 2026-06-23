@@ -16,7 +16,7 @@ import redis
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger("proxy_rotator")
 
-app = FastAPI(title="TTM Proxy Rotator Service")
+app = FastAPI(title="Ticket Proxy Rotator Service")
 
 # CORS config
 app.add_middleware(
@@ -31,19 +31,19 @@ REDIS_URL = os.environ.get("REDIS_URL", "redis://redis:6379/0")
 r = redis.from_url(REDIS_URL, decode_responses=True)
 
 # ── Redis Key Schema Constants ───────────────────────────────────────────────
-KEY_RAW_PROXIES = "ttm:proxies:raw"         # Set of raw proxy URLs
-KEY_ACTIVE_PROXIES = "ttm:proxies:active"   # Set of healthy active proxy URLs
-KEY_DEAD_PROXIES = "ttm:proxies:dead"       # Set of dead/unhealthy proxy URLs
+KEY_RAW_PROXIES = "ticket:proxies:raw"         # Set of raw proxy URLs
+KEY_ACTIVE_PROXIES = "ticket:proxies:active"   # Set of healthy active proxy URLs
+KEY_DEAD_PROXIES = "ticket:proxies:dead"       # Set of dead/unhealthy proxy URLs
 LEASE_TTL = 45                              # Lease TTL in seconds
 
 def get_proxy_hash(proxy: str) -> str:
     return hashlib.md5(proxy.encode("utf-8")).hexdigest()
 
 def get_meta_key(proxy: str) -> str:
-    return f"ttm:proxies:meta:{get_proxy_hash(proxy)}"
+    return f"ticket:proxies:meta:{get_proxy_hash(proxy)}"
 
 def get_lease_key(proxy: str) -> str:
-    return f"ttm:proxies:lease:{get_proxy_hash(proxy)}"
+    return f"ticket:proxies:lease:{get_proxy_hash(proxy)}"
 
 # ── Health Checker Implementation ────────────────────────────────────────────
 
@@ -154,7 +154,7 @@ async def run_health_checker():
     while True:
         try:
             # Sync raw proxies list from general config
-            cfg_str = r.get("ttm:config")
+            cfg_str = r.get("ticket:config")
             if cfg_str:
                 cfg = json.loads(cfg_str)
                 current_saved_at = cfg.get("_saved_at")
@@ -172,7 +172,7 @@ async def run_health_checker():
                             continue
                         if "{session}" in p:
                             for i in range(1, 41):
-                                expanded_p = p.replace("{session}", f"ttmsess{i:03d}")
+                                expanded_p = p.replace("{session}", f"ticketsess{i:03d}")
                                 r.sadd(KEY_RAW_PROXIES, expanded_p)
                         else:
                             r.sadd(KEY_RAW_PROXIES, p)
@@ -241,19 +241,19 @@ async def upload_proxies(request: Request):
         # If it contains {session}, expand it into session-based proxies
         if "{session}" in p:
             for s in range(1, session_count + 1):
-                sess_proxy = p.replace("{session}", f"ttm{random.randint(100000, 999999)}")
+                sess_proxy = p.replace("{session}", f"Ticket{random.randint(100000, 999999)}")
                 r.sadd(KEY_RAW_PROXIES, sess_proxy)
                 added_count += 1
         else:
             r.sadd(KEY_RAW_PROXIES, p)
             added_count += 1
 
-    # Also update ttm:config so the main dashboard Setup page aligns
-    cfg_str = r.get("ttm:config")
+    # Also update ticket:config so the main dashboard Setup page aligns
+    cfg_str = r.get("ticket:config")
     if cfg_str:
         cfg = json.loads(cfg_str)
         cfg["proxies"] = proxies_list
-        r.set("ttm:config", json.dumps(cfg))
+        r.set("ticket:config", json.dumps(cfg))
 
     # Trigger async re-check of newly uploaded proxies
     asyncio.create_task(run_health_checker())
@@ -370,7 +370,7 @@ async def serve_dashboard():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>TTM Proxy Rotator & Health Checker</title>
+        <title>Ticket Proxy Rotator & Health Checker</title>
         <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
         <style>
             :root {
@@ -646,8 +646,8 @@ async def serve_dashboard():
         <div class="container">
             <header>
                 <div class="logo-section">
-                    <h1>🇹🇭 TTM Proxy Rotator & Health Checker</h1>
-                    <p>Production-Grade Residential & ISP Proxy Manager for ThaiTicketMajor</p>
+                    <h1>🇹🇭 Ticket Proxy Rotator & Health Checker</h1>
+                    <p>Production-Grade Residential & ISP Proxy Manager for Ticket Platform</p>
                 </div>
                 <div style="display: flex; gap: 0.5rem; align-items: center;">
                     <span id="checking-indicator" class="badge-active" style="display:none; animation: pulse 1.5s infinite;">⚡ checking...</span>

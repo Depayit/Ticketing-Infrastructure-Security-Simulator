@@ -2,7 +2,7 @@
 Minimal Akamai simulation for the defense-demo stack.
 
 This is a stub implementation to make the gateway runnable.
-It is intentionally permissive for local testing of the TTM bot.
+It is intentionally permissive for local testing of the Ticket bot.
 
 The real production Akamai is opaque and cryptographic.
 Here we just parse the synthetic payloads the bot sends in defense_funnel mode.

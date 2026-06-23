@@ -183,8 +183,8 @@ async def notify_payment_ready(
         "ts": datetime.now().isoformat(),
     }
     try:
-        r_client.lpush("ttm:payment_ready", json.dumps(handoff))
-        r_client.ltrim("ttm:payment_ready", 0, 50)
+        r_client.lpush("ticket:payment_ready", json.dumps(handoff))
+        r_client.ltrim("ticket:payment_ready", 0, 50)
     except Exception:
         pass
 

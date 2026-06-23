@@ -3,7 +3,7 @@ version: '3.9'
 services:
   redis:
     image: redis:7-alpine
-    container_name: ttm-redis
+    container_name: ticket-redis
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
@@ -13,7 +13,7 @@ services:
     build:
       context: ./proxy-rotator
       dockerfile: Dockerfile
-    container_name: ttm-proxy-rotator
+    container_name: ticket-proxy-rotator
     ports:
       - "8001:8080"
     depends_on:
@@ -26,7 +26,7 @@ services:
     build:
       context: .
       dockerfile: ./manager/Dockerfile
-    container_name: ttm-manager
+    container_name: ticket-manager
     ports:
       - "8080:8080"
     depends_on:
@@ -40,7 +40,7 @@ services:
     build:
       context: .
       dockerfile: ./manager/Dockerfile
-    container_name: ttm-telegram-dashboard
+    container_name: ticket-telegram-dashboard
     command: python telegram_bot.py
     depends_on:
       - redis

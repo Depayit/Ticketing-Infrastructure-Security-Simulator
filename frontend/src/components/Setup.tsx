@@ -249,7 +249,7 @@ function ReadinessOverview({ profiles }: { profiles: Profile[] }) {
 }
 
 export default function Setup() {
-  type Tab = 'basic' | 'telegram' | 'proxies' | 'profiles' | 'browser' | 'ttm';
+  type Tab = 'basic' | 'telegram' | 'proxies' | 'profiles' | 'browser' | 'ticket';
   const [setupTab, setSetupTab] = useState<Tab>('basic');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showStealthDetails, setShowStealthDetails] = useState(false);
@@ -385,10 +385,10 @@ export default function Setup() {
   const inputClass =
     'w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:border-emerald-500 focus:outline-none';
 
-  const TtmTabLink = ({ label }: { label: string }) => (
+  const TicketTabLink = ({ label }: { label: string }) => (
     <button
       type="button"
-      onClick={() => setSetupTab('ttm')}
+      onClick={() => setSetupTab('ticket')}
       className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-400 hover:text-emerald-300 transition"
     >
       {label}
@@ -423,7 +423,7 @@ export default function Setup() {
           name="browser"
           label={`🛡️ Browser${config.browser_profiles.length > 0 ? ` (${config.browser_profiles.length})` : ''}`}
         />
-        <TabButton name="ttm" label="🎫 TTM Purchase" />
+        <TabButton name="ticket" label="🎫 Ticket Purchase" />
       </div>
 
       {/* Content panel */}
@@ -531,7 +531,7 @@ export default function Setup() {
                       value={config.target_url || ''}
                       onChange={(e) => setConfig({ ...config, target_url: e.target.value })}
                       className={inputClass}
-                      placeholder="https://www.thaiticketmajor.com/concert/..."
+                      placeholder="https://www.Ticket Platform.com/concert/..."
                     />
                   </div>
                   <div>
@@ -543,7 +543,7 @@ export default function Setup() {
                       value={config.event_id}
                       onChange={(e) => setConfig({ ...config, event_id: e.target.value })}
                       className={inputClass}
-                      placeholder="ttm-bkk-blackpink-world-tour-2026"
+                      placeholder="Ticket-bkk-blackpink-world-tour-2026"
                     />
                   </div>
                   <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/30 px-4 py-3 text-sm text-zinc-300 space-y-2">
@@ -560,7 +560,7 @@ export default function Setup() {
                   <div className="rounded-lg bg-zinc-900/60 border border-zinc-700/50 px-4 py-3 text-sm text-zinc-400 space-y-2">
                     <p>
                       หลังผ่านคิว บอทจะกดจอง / เลือกที่นั่ง / hold — ตั้งค่า selectors และ hold time ที่แท็บ{' '}
-                      <TtmTabLink label="TTM Purchase" />
+                      <TicketTabLink label="Ticket Purchase" />
                     </p>
                     <p className="text-xs text-zinc-500">
                       แนะนำ: ตั้ง Proxies, Buyer Profiles และ Browser Profiles ก่อนเริ่มงาน
@@ -593,10 +593,10 @@ export default function Setup() {
                       Poll ห้องรอ, Still here?, login sandbox — ตั้งที่แท็บ{' '}
                       <button
                         type="button"
-                        onClick={() => setSetupTab('ttm')}
+                        onClick={() => setSetupTab('ticket')}
                         className="text-violet-300 hover:text-violet-200 font-medium"
                       >
-                        TTM Purchase → Defense Demo
+                        Ticket Purchase → Defense Demo
                       </button>
                     </p>
                   </div>
@@ -607,7 +607,7 @@ export default function Setup() {
                 <div className="mb-4 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
                   <div className="text-blue-400 font-semibold text-sm mb-2">💡 Proxy Best Practice (โหมดใช้งานจริง)</div>
                   <ul className="text-zinc-400 text-xs space-y-1.5 pl-4 list-disc marker:text-blue-500/50">
-                    <li><strong className="text-zinc-300">ใช้ Residential Sticky:</strong> TTM/Queue-it อิงตาม IP Session ห้ามใช้แบบ Rotating ทุก Request ให้ล็อค IP อย่างน้อย 15-30 นาที</li>
+                    <li><strong className="text-zinc-300">ใช้ Residential Sticky:</strong> Ticket/Queue-it อิงตาม IP Session ห้ามใช้แบบ Rotating ทุก Request ให้ล็อค IP อย่างน้อย 15-30 นาที</li>
                     <li><strong className="text-zinc-300">แนะนำโปรโตคอล SOCKS5:</strong> ปลอดภัยกว่า ไร้ร่องรอย Header และรองรับ WebSockets ของ Queue-it ได้เสถียรที่สุด</li>
                     <li><strong className="text-zinc-300">ตั้งค่า Location TH:</strong> บอทต้องใช้ IP Thailand 🇹🇭 เท่านั้น ป้องกันการโดนบล็อคในขั้นตอน Payment</li>
                   </ul>
@@ -661,7 +661,7 @@ export default function Setup() {
             <div className="rounded-lg bg-zinc-800/60 border border-zinc-700/50 px-4 py-3 text-sm text-zinc-400 leading-relaxed">
               {botMode === 'queueit' ? (
                 <p>
-                  โหมด <strong className="text-emerald-400">ThaiTicket</strong>: ส่งลิงก์หน้าชำระเงินอัตโนมัติเมื่อบอท hold
+                  โหมด <strong className="text-emerald-400">Ticket</strong>: ส่งลิงก์หน้าชำระเงินอัตโนมัติเมื่อบอท hold
                   ที่นั่งสำเร็จ — ต้องใส่ Bot Token จริง (ไม่ใช่ YOUR_...) และกด Start กับ bot ในแชท
                 </p>
               ) : (
@@ -818,11 +818,11 @@ export default function Setup() {
           />
         )}
 
-        {/* TTM Purchase Flow */}
-        {setupTab === 'ttm' && (
+        {/* Ticket Purchase Flow */}
+        {setupTab === 'ticket' && (
           <div className="space-y-8">
             <div>
-              <h2 className="text-2xl font-semibold mb-1">TTM Purchase Flow</h2>
+              <h2 className="text-2xl font-semibold mb-1">Ticket Purchase Flow</h2>
               <p className="text-zinc-400 text-sm">ตั้งค่า Queue-it browser flow: คิว → ที่นั่ง → hold</p>
             </div>
 
@@ -852,7 +852,7 @@ export default function Setup() {
                   value={config.membership_code || ''}
                   onChange={(e) => setConfig({ ...config, membership_code: e.target.value })}
                   className={inputClass}
-                  placeholder="เช่น TTM-MEMBER-9999"
+                  placeholder="เช่น MEMBER-9999"
                 />
               </div>
             </div>

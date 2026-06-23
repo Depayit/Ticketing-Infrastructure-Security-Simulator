@@ -1,12 +1,12 @@
 (function () {
   "use strict";
 
-  const EVENT = window.TTM_EVENT || {
+  const EVENT = window.ticket_EVENT || {
     id: "demo-concert-2026",
     name: "BTS WORLD TOUR 'ARIRANG' IN BANGKOK",
   };
 
-  const STORAGE_KEY = "ttm_waiting_room_state";
+  const STORAGE_KEY = "ticket_waiting_room_state";
   const params = new URLSearchParams(location.search);
   const isDemo = params.get("demo") === "1";
 
@@ -21,10 +21,10 @@
   };
 
   const now = Date.now();
-  let saleStartMs = parseInt(localStorage.getItem("ttm_sale_start_ms") || "0", 10) || now + 5 * 60 * 1000;
+  let saleStartMs = parseInt(localStorage.getItem("ticket_sale_start_ms") || "0", 10) || now + 5 * 60 * 1000;
 
-  if (!localStorage.getItem("ttm_sale_start_ms")) {
-    localStorage.setItem("ttm_sale_start_ms", String(saleStartMs));
+  if (!localStorage.getItem("ticket_sale_start_ms")) {
+    localStorage.setItem("ticket_sale_start_ms", String(saleStartMs));
   }
 
   let preLoginStartMs = saleStartMs - CONFIG.preLoginMinutes * 60 * 1000;
@@ -78,7 +78,7 @@
   TTMUI.setPageTitle("Waiting Room");
 
   function getOrCreateQueueId() {
-    let id = sessionStorage.getItem("ttm_queue_id");
+    let id = sessionStorage.getItem("ticket_queue_id");
     if (!id) {
       if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
         id = crypto.randomUUID();
@@ -88,7 +88,7 @@
           return v.toString(16);
         });
       }
-      sessionStorage.setItem("ttm_queue_id", id);
+      sessionStorage.setItem("ticket_queue_id", id);
     }
     return id;
   }
@@ -398,7 +398,7 @@
 
       if (qs?.status === "pre_queue") {
         saleStartMs = qs.startTime * 1000;
-        localStorage.setItem("ttm_sale_start_ms", String(saleStartMs));
+        localStorage.setItem("ticket_sale_start_ms", String(saleStartMs));
         clearTimers();
         saveState({ inQueue: false, joinedQueue: false, loggedIn: true });
         showCountdown();
@@ -467,7 +467,7 @@
       const qs = data?.data?.queueStatus;
       if (qs?.status === "pre_queue" && qs?.startTime) {
         saleStartMs = qs.startTime * 1000;
-        localStorage.setItem("ttm_sale_start_ms", String(saleStartMs));
+        localStorage.setItem("ticket_sale_start_ms", String(saleStartMs));
       } else if (qs?.startTime === 0) {
         saleStartMs = Date.now() - 1000; // already started
       }
