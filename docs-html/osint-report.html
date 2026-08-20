@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>รายงาน OSINT Security Assessment | Ticketing Infrastructure Security Simulator</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header class="top-header">
+    <div style="display: flex; align-items: center; gap: 1rem;">
+      <button class="menu-toggle" id="menuToggle" aria-label="Toggle Menu">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+      </button>
+      <a href="index.html" class="logo-area">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span>Ticketing Security Sim</span>
+        <span class="logo-badge">DOCS V2.0</span>
+      </a>    <div class="header-right">
+      <a href="https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator" target="_blank" class="github-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        <span>GitHub Repo</span>
+      </a>
+      <div class="status-pill">
+        <span class="status-dot"></span>
+        <span>SYSTEM OPERATIONAL</span>
+      </div>
+      <div class="search-box">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input type="text" id="searchInput" placeholder="ค้นหาในรายงาน OSINT...">
+      </div>
+    </div>
+  </header>
+
+  <div class="layout-wrapper">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="nav-section">
+        <div class="nav-section-title">เอกสารและภาพรวม</div>
+        <ul class="nav-list">
+          <li class="nav-item"><a href="index.html"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg> ภาพรวมระบบ (Overview)</a></li>
+          <li class="nav-item"><a href="architecture.html"><svg class="nav-icon" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="10" x2="6" y2="14"/><line x1="18" y1="10" x2="18" y2="14"/></svg> สถาปัตยกรรม (Architecture)</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title">ส่วนประกอบของระบบ</div>
+        <ul class="nav-list">
+          <li class="nav-item"><a href="offense.html"><svg class="nav-icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> ฝั่งการโจมตี (Offense Engine)</a></li>
+          <li class="nav-item"><a href="defense.html"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> ฝั่งการป้องกัน (Defense Stack)</a></li>
+          <li class="nav-item"><a href="management.html"><svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg> บริหารจัดการ (Manager & Admin)</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title">รายงานและการทดสอบ</div>
+        <ul class="nav-list">
+          <li class="nav-item active"><a href="osint-report.html"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> รายงาน OSINT Assessment</a></li>
+          <li class="nav-item"><a href="case-study.html"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> กรณีศึกษา Red vs Blue</a></li>
+          <li class="nav-item"><a href="operation-guide.html"><svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> คู่มือการใช้งาน (Manual)</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title">ซอร์สโค้ดใน Repository</div>
+        <ul class="nav-list">
+          <li class="nav-item"><a href="https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator/tree/main/manager" target="_blank"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> /manager (FastAPI)</a></li>
+          <li class="nav-item"><a href="https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator/tree/main/worker" target="_blank"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> /worker (Stealth Bot)</a></li>
+          <li class="nav-item"><a href="https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator/tree/main/proxy-rotator" target="_blank"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> /proxy-rotator</a></li>
+          <li class="nav-item"><a href="https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator/tree/main/defense-demo" target="_blank"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> /defense-demo</a></li>
+          <li class="nav-item"><a href="https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator/tree/main/frontend" target="_blank"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> /frontend (Dashboard)</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="page-header">
+        <h1 class="page-title">รายงาน OSINT Security Assessment (Version 2.0)</h1>
+        <p class="page-subtitle">รายงานการวิเคราะห์และประเมินสถาปัตยกรรมความปลอดภัยของระบบจำหน่ายตั๋วขนาดใหญ่ด้วยวิธี Open Source Intelligence</p>
+      </div>
+
+      <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <div>
+            <h2 style="font-size: 1.3rem; color: #fff;">Executive Summary</h2>
+            <p style="font-size: 0.85rem; color: var(--text-dim);">ผู้เขียน: Jacob (Depayit) | สาขาวิจัย: Infrastructure Intelligence & Security Architecture</p>
+          </div>
+          <span class="badge badge-purple">OSINT Passive Research</span>
+        </div>
+        <p style="font-size: 0.92rem; color: var(--text-muted); line-height: 1.7;">
+          รายงานฉบับนี้เสนอผลการวิเคราะห์และประเมินกลไกป้องกันความปลอดภัยของแพลตฟอร์มจำหน่ายตั๋วออนไลน์ระดับประเทศด้วยวิธี <strong>Passive OSINT</strong> โดยมุ่งเน้นศึกษาโครงสร้างการป้องกันทราฟฟิกหนาแน่น การจัดการคิวห้องรอ การตรวจจับบอทอัตโนมัติ และการคงความพร้อมใช้งานของระบบโดยไม่ได้ล่วงล้ำหรือทดสอบโจมตีโดยไม่ได้รับอนุญาต
+        </p>
+      </div>
+
+      <!-- Findings Summary -->
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Finding 01: Edge Infrastructure</span>
+            <span class="badge badge-green">Confidence: High</span>
+          </div>
+          <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.6;">
+            พบการใช้งาน Cloud Edge Security Service ในการดูดซับทราฟฟิกรวมมหาศาล รองรับ DDoS Mitigation, Rate Limiting และ Application Layer Filtering ก่อนคำขอจะถึงเซิร์ฟเวอร์หลัก
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Finding 02: AI Bot Framework</span>
+            <span class="badge badge-cyan">Confidence: Med-High</span>
+          </div>
+          <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.6;">
+            พบตัวชี้วัดการวิเคราะห์พฤติกรรม (Behavioral Telemetry) และ Device Fingerprinting สำหรับคำนวณ Session Reputation Score แบบเรียลไทม์เพื่อแยกมนุษย์ออกจากสคริปต์อัตโนมัติ
+          </p>
+        </div>
+      </div>
+
+      <!-- Security Evaluation Matrix -->
+      <div class="card">
+        <h2 style="font-size: 1.25rem; margin-bottom: 1rem; color: #fff;">ตารางประเมินระดับความเข้มงวดความปลอดภัย (Security Evaluation Matrix)</h2>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Security Category</th>
+                <th>Assessment Level</th>
+                <th>Key Defense Controls Identified</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Availability Protection</td>
+                <td><span class="badge badge-green">Strong</span></td>
+                <td>Edge CDN Filtering, Cluster Rate Limiting, DDoS Mitigation</td>
+              </tr>
+              <tr>
+                <td>Traffic Filtering</td>
+                <td><span class="badge badge-green">Strong</span></td>
+                <td>WAF Burst Controls, Datacenter IP Blacklisting</td>
+              </tr>
+              <tr>
+                <td>Bot Detection</td>
+                <td><span class="badge badge-green">Strong</span></td>
+                <td>Akamai Sensor Integration, AI Behavioral Analytics, Telemetry</td>
+              </tr>
+              <tr>
+                <td>Queue Management</td>
+                <td><span class="badge badge-green">Strong</span></td>
+                <td>Virtual Waiting Room, Priority Score-based Queue Admission</td>
+              </tr>
+              <tr>
+                <td>Session Security</td>
+                <td><span class="badge badge-cyan">Moderate-Strong</span></td>
+                <td>Persistent Tokens, Cookie Binding, Replay Resistance</td>
+              </tr>
+              <tr>
+                <td>Identity Assurance</td>
+                <td><span class="badge badge-amber">Moderate</span></td>
+                <td>3DS Payment Gateway, OTP Verification</td>
+              </tr>
+              <tr>
+                <td>Fraud Resistance</td>
+                <td><span class="badge badge-green">Strong</span></td>
+                <td>IsolationForest Anomaly Model, Pessimistic Seat Locking</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Key Lessons -->
+      <div class="card">
+        <h2 style="font-size: 1.25rem; margin-bottom: 1rem; color: #fff;">บทเรียนสำคัญและการประเมินในอนาคต (Lessons Learned)</h2>
+        <ul style="font-size: 0.9rem; color: var(--text-muted); padding-left: 1.2rem; line-height: 1.8;">
+          <li>การป้องกันเพียง Signature-based หรือ IP Rate Limit แบบเดิมไม่เพียงพอสำหรับต่อกรกับระบบบอทสมัยใหม่ที่มี Residential Proxy</li>
+          <li>การผสมผสานระหว่าง <strong>AI Behavioral Biometrics</strong>, <strong>Edge Processing</strong> และ <strong>Priority Waiting Room</strong> คือหัวใจสำคัญของการรักษาความเท่าเทียมในการซื้อตั๋ว</li>
+        </ul>
+      </div>
+
+      <footer>
+        Ticketing Infrastructure Security Simulator &copy; 2026. Designed for Cybersecurity Research & Infrastructure Intelligence.
+      </footer>
+    </main>
+  </div>
+
+  <script src="assets/script.js"></script>
+</body>
+</html>

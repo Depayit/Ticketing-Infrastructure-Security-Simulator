@@ -53,9 +53,32 @@ The platform is designed around a distributed architecture consisting of multipl
 
 ---
 
-# System Architecture
+## System Architecture
 
-![System Architecture](docs/architecture.png)
+```text
+                +------------------+
+                |    Dashboard     |
+                +---------+--------+
+                          |
+                          v
+                +------------------+
+                |     Manager      |
+                +---------+--------+
+                          |
+          +---------------+---------------+
+          |                               |
+          v                               v
+   +-------------+                +-------------+
+   |  Worker #1  |                |  Worker #N  |
+   +-------------+                +-------------+
+          |                               |
+          +---------------+---------------+
+                          |
+                          v
+                   +-------------+
+                   |    Redis    |
+                   +-------------+
+```
 
 ---
 

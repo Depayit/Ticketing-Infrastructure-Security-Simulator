@@ -2,7 +2,7 @@
 
 Version 2.0
 
-Author: Jacob Nuttapong (Depayit)
+Author: Jacob (Depayit)
 
 Research Domain:
 Cybersecurity Research | Infrastructure Intelligence | Security Architecture Analysis | OSINT

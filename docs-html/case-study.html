@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>กรณีศึกษา Red vs Blue | Ticketing Infrastructure Security Simulator</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header class="top-header">
+    <div style="display: flex; align-items: center; gap: 1rem;">
+      <button class="menu-toggle" id="menuToggle" aria-label="Toggle Menu">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+      </button>
+      <a href="index.html" class="logo-area">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span>Ticketing Security Sim</span>
+        <span class="logo-badge">DOCS V2.0</span>
+      </a>
+    </div>
+    <div class="header-right">
+      <a href="https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator" target="_blank" class="github-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        <span>GitHub Repo</span>
+      </a>
+      <div class="status-pill">
+        <span class="status-dot"></span>
+        <span>SYSTEM OPERATIONAL</span>
+      </div>
+      <div class="search-box">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input type="text" id="searchInput" placeholder="ค้นหาในกรณีศึกษา...">
+      </div>
+    </div>
+  </header>
+
+  <div class="layout-wrapper">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="nav-section">
+        <div class="nav-section-title">เอกสารและภาพรวม</div>
+        <ul class="nav-list">
+          <li class="nav-item"><a href="index.html"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg> ภาพรวมระบบ (Overview)</a></li>
+          <li class="nav-item"><a href="architecture.html"><svg class="nav-icon" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="10" x2="6" y2="14"/><line x1="18" y1="10" x2="18" y2="14"/></svg> สถาปัตยกรรม (Architecture)</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title">ส่วนประกอบของระบบ</div>
+        <ul class="nav-list">
+          <li class="nav-item"><a href="offense.html"><svg class="nav-icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> ฝั่งการโจมตี (Offense Engine)</a></li>
+          <li class="nav-item"><a href="defense.html"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> ฝั่งการป้องกัน (Defense Stack)</a></li>
+          <li class="nav-item"><a href="management.html"><svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg> บริหารจัดการ (Manager & Admin)</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title">รายงานและการทดสอบ</div>
+        <ul class="nav-list">
+          <li class="nav-item"><a href="osint-report.html"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> รายงาน OSINT Assessment</a></li>
+          <li class="nav-item active"><a href="case-study.html"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> กรณีศึกษา Red vs Blue</a></li>
+          <li class="nav-item"><a href="operation-guide.html"><svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> คู่มือการใช้งาน (Manual)</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title">ซอร์สโค้ดใน Repository</div>
+        <ul class="nav-list">
+          <li class="nav-item"><a href="https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator/tree/main/manager" target="_blank"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> /manager (FastAPI)</a></li>
+          <li class="nav-item"><a href="https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator/tree/main/worker" target="_blank"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> /worker (Stealth Bot)</a></li>
+          <li class="nav-item"><a href="https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator/tree/main/proxy-rotator" target="_blank"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> /proxy-rotator</a></li>
+          <li class="nav-item"><a href="https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator/tree/main/defense-demo" target="_blank"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> /defense-demo</a></li>
+          <li class="nav-item"><a href="https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator/tree/main/frontend" target="_blank"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> /frontend (Dashboard)</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="page-header">
+        <h1 class="page-title">กรณีศึกษาและการทดสอบ Red Team vs Blue Team</h1>
+        <p class="page-subtitle">กรณีศึกษาการทดสอบจำลองเหตุการณ์จริง (Simulation Scenarios) บนคอนเสิร์ต 2026 JACOB WORLD TOUR IN BANGKOK</p>
+      </div>
+
+      <!-- Scenarios Grid -->
+      <div class="grid-2">
+        
+        <!-- Scenario A -->
+        <div class="card" style="border-left: 4px solid var(--accent-amber);">
+          <div class="card-header">
+            <span class="card-title">Scenario A — Basic Burst Bot &rarr; IP Layer Block</span>
+            <span class="badge badge-amber">IP Blocked</span>
+          </div>
+          <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 0.8rem;">
+            สคริปต์บอทส่ง Request ถี่สูงเกินกำหนด (&gt;15 req / 5s) ไปยัง GraphQL Endpoint:
+          </p>
+<pre><code>for i in {1..20}; do
+  curl -s -o /dev/null -w "%{http_code}\n" \
+  -X POST http://localhost:8090/graphql/v2 \
+  -H "Content-Type: application/json" \
+  -d '{"query":"query { queueStatus(eventId: \"demo-concert-2026\") { status token } }"}'
+done</code></pre>
+          <div class="alert alert-warning" style="margin-top: 0.8rem; margin-bottom: 0;">
+            <strong>ผลลัพธ์:</strong> ถูก Gateway สั่งตัดการทำงานทันทีด้วยรหัส <code>429 RATE_LIMIT_BURST</code>
+          </div>
+        </div>
+
+        <!-- Scenario B -->
+        <div class="card" style="border-left: 4px solid var(--accent-red);">
+          <div class="card-header">
+            <span class="card-title">Scenario B — Advanced Bot &rarr; AI Layer Block</span>
+            <span class="badge badge-red">AI Fraud Blocked</span>
+          </div>
+          <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 0.8rem;">
+            รัน <code>worker/bot.py</code> ยิงตรงข้ามคิวโดยไม่มี Telemetry เมาส์และสคริปต์เซนเซอร์:
+          </p>
+          <ul style="font-size: 0.85rem; color: var(--text-muted); padding-left: 1.2rem; margin-bottom: 0.8rem;">
+            <li><code>_token_warmup_loop</code> แอบขอ Token ล่วงหน้า</li>
+            <li><code>_purchase_wave_custom</code> ยิง Concurrent addToCart</li>
+            <li>ไม่มี Mouse Movement / Scroll Velocity events</li>
+          </ul>
+          <div class="alert alert-danger" style="margin-bottom: 0;">
+            <strong>ผลลัพธ์:</strong> AI Fraud Engine ตรวจพบความผิดปกติ ส่งรหัสปฏิเสธ <code>403 FRAUD_DETECTED</code>
+          </div>
+        </div>
+
+        <!-- Scenario C -->
+        <div class="card" style="border-left: 4px solid var(--accent-green);">
+          <div class="card-header">
+            <span class="card-title">Scenario C — Human User &rarr; Passed All Layers</span>
+            <span class="badge badge-green">Success Commit</span>
+          </div>
+          <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 0.8rem;">
+            ผู้ใช้งานจริงเข้าผ่านเบราว์เซอร์ <code>http://localhost:8090/</code>:
+          </p>
+          <ol style="font-size: 0.85rem; color: var(--text-muted); padding-left: 1.2rem; margin-bottom: 0.8rem;">
+            <li>รอผ่านห้องรอ Waiting Room (Akamai Sensor คำนวณ Bot Score ต่ำ)</li>
+            <li>ขยับเมาส์ เลื่อนหน้าจอ และคลิกเลือกที่นั่ง (Telemetry ส่งอัตโนมัติ)</li>
+            <li>กรอก OTP <code>123456</code> ที่หน้าชำระเงิน 3DS</li>
+          </ol>
+          <div class="alert alert-success" style="margin-bottom: 0.8rem;">
+            <strong>ผลลัพธ์:</strong> ทำรายการสำเร็จ ที่นั่งถูก Commit เข้าสู่ฐานข้อมูล
+          </div>
+
+          <h4 style="font-size: 0.9rem; color: #fff; margin-bottom: 0.5rem;">ภาพถ่ายการเข้าซื้อตั๋วของผู้ใช้งานจริงทุกขั้นตอน (End-to-End Human Flow):</h4>
+          <div class="gallery-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+            <div class="gallery-card">
+              <a href="assets/images/queue_entry_zone.jpg" target="_blank">
+                <img src="assets/images/queue_entry_zone.jpg" alt="Entry Zone Modal" style="height: 110px;">
+              </a>
+              <div class="gallery-caption"><p style="font-size: 0.75rem;">1. Entry Zone Modal</p></div>
+            </div>
+            <div class="gallery-card">
+              <a href="assets/images/queue_countdown.jpg" target="_blank">
+                <img src="assets/images/queue_countdown.jpg" alt="Waiting Room Countdown" style="height: 110px;">
+              </a>
+              <div class="gallery-caption"><p style="font-size: 0.75rem;">2. Countdown Timer</p></div>
+            </div>
+            <div class="gallery-card">
+              <a href="assets/images/queue_bot_score.jpg" target="_blank">
+                <img src="assets/images/queue_bot_score.jpg" alt="Priority Buying Queue" style="height: 110px;">
+              </a>
+              <div class="gallery-caption"><p style="font-size: 0.75rem;">3. Priority Queue</p></div>
+            </div>
+            <div class="gallery-card">
+              <a href="assets/images/performance_date_selection.jpg" target="_blank">
+                <img src="assets/images/performance_date_selection.jpg" alt="Show Date Selector" style="height: 110px;">
+              </a>
+              <div class="gallery-caption"><p style="font-size: 0.75rem;">4. เลือกรอบการแสดง</p></div>
+            </div>
+            <div class="gallery-card">
+              <a href="assets/images/seat_map_selection.jpg" target="_blank">
+                <img src="assets/images/seat_map_selection.jpg" alt="Seat Map Selection UI" style="height: 110px;">
+              </a>
+              <div class="gallery-caption"><p style="font-size: 0.75rem;">5. ผังเลือกที่นั่ง</p></div>
+            </div>
+            <div class="gallery-card">
+              <a href="assets/images/checkout_details.jpg" target="_blank">
+                <img src="assets/images/checkout_details.jpg" alt="Checkout Details" style="height: 110px;">
+              </a>
+              <div class="gallery-caption"><p style="font-size: 0.75rem;">6. กรอกชื่อผู้เข้าชม</p></div>
+            </div>
+            <div class="gallery-card">
+              <a href="assets/images/checkout_payment_methods.jpg" target="_blank">
+                <img src="assets/images/checkout_payment_methods.jpg" alt="Payment Methods" style="height: 110px;">
+              </a>
+              <div class="gallery-caption"><p style="font-size: 0.75rem;">7. เลือกช่องทางจ่ายเงิน</p></div>
+            </div>
+            <div class="gallery-card">
+              <a href="assets/images/payment_3ds_qr.jpg" target="_blank">
+                <img src="assets/images/payment_3ds_qr.jpg" alt="3DS QR Code Gateway" style="height: 110px;">
+              </a>
+              <div class="gallery-caption"><p style="font-size: 0.75rem;">8. 3DS QR Payment</p></div>
+            </div>
+            <div class="gallery-card">
+              <a href="assets/images/payment_completed_alert.jpg" target="_blank">
+                <img src="assets/images/payment_completed_alert.jpg" alt="Payment Success Alert" style="height: 110px;">
+              </a>
+              <div class="gallery-caption"><p style="font-size: 0.75rem;">9. ชำระเงินสำเร็จ</p></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scenario D -->
+        <div class="card" style="border-left: 4px solid var(--accent-purple);">
+          <div class="card-header">
+            <span class="card-title">Scenario D — Bot Evasion &rarr; 3DS Layer Block</span>
+            <span class="badge badge-purple">3DS Fail</span>
+          </div>
+          <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 0.8rem;">
+            ทดลองปิดชั้น AI Layer ด้วยการตั้งค่า <code>AI_LAYER_ENABLED=false</code>:
+          </p>
+          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.8rem;">
+            บอทสามารถล็อกที่นั่งได้ชั่วคราว แต่เมื่อถึงขั้นตอนสุดท้าย ไม่สามารถกรอก OTP หรือยืนยันตัวตน 3DS Payment ได้
+          </p>
+          <div class="alert alert-info" style="margin-bottom: 0.8rem;">
+            <strong>ผลลัพธ์:</strong> 3DS Timeout หรือ OTP ล้มเหลว ส่งผลให้คำสั่งไม่ถูก Commit และสิทธิ์ที่นั่งถูกคืนเข้าพูล (Seat Release)
+          </div>
+
+          <h4 style="font-size: 0.9rem; color: #fff; margin-bottom: 0.5rem;">ภาพถ่ายการส่ง Challenge & การแก้คำถามล้มเหลว:</h4>
+          <div class="gallery-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+            <div class="gallery-card">
+              <a href="assets/images/security_check_challenge.jpg" target="_blank">
+                <img src="assets/images/security_check_challenge.jpg" alt="Akamai Challenge Drag Puzzle" style="height: 120px;">
+              </a>
+            </div>
+            <div class="gallery-card">
+              <a href="assets/images/challenge_error_alert.jpg" target="_blank">
+                <img src="assets/images/challenge_error_alert.jpg" alt="Challenge Error Alert" style="height: 120px;">
+              </a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <footer>
+        Ticketing Infrastructure Security Simulator &copy; 2026. Designed for Cybersecurity Research & Infrastructure Intelligence.
+      </footer>
+    </main>
+  </div>
+
+  <script src="assets/script.js"></script>
+</body>
+</html>
