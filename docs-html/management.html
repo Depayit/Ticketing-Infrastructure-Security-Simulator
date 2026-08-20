@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ระบบบริหารจัดการและส่วนควบคุม | Ticketing Infrastructure Security Simulator</title>
+  <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header class="top-header">
+    <div style="display: flex; align-items: center; gap: 1rem;">
+      <button class="menu-toggle" id="menuToggle" aria-label="Toggle Menu">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+      </button>
+      <a href="index.html" class="logo-area">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span>Ticketing Security Sim</span>
+        <span class="logo-badge">DOCS V2.0</span>
+      </a>
+    </div>
+    <div class="header-right">
+      <a href="https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator" target="_blank" class="github-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        <span>GitHub Repo</span>
+      </a>
+      <div class="status-pill">
+        <span class="status-dot"></span>
+        <span>SYSTEM OPERATIONAL</span>
+      </div>
+      <div class="search-box">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input type="text" id="searchInput" placeholder="ค้นหาในระบบบริหารจัดการ...">
+      </div>
+    </div>
+  </header>
+
+  <div class="layout-wrapper">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="nav-section">
+        <div class="nav-section-title">เอกสารและภาพรวม</div>
+        <ul class="nav-list">
+          <li class="nav-item"><a href="index.html"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg> ภาพรวมระบบ (Overview)</a></li>
+          <li class="nav-item"><a href="architecture.html"><svg class="nav-icon" viewBox="0 0 24 24"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="10" x2="6" y2="14"/><line x1="18" y1="10" x2="18" y2="14"/></svg> สถาปัตยกรรม (Architecture)</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title">ส่วนประกอบของระบบ</div>
+        <ul class="nav-list">
+          <li class="nav-item"><a href="offense.html"><svg class="nav-icon" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> ฝั่งการโจมตี (Offense Engine)</a></li>
+          <li class="nav-item"><a href="defense.html"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> ฝั่งการป้องกัน (Defense Stack)</a></li>
+          <li class="nav-item active"><a href="management.html"><svg class="nav-icon" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg> บริหารจัดการ (Manager & Admin)</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title">รายงานและการทดสอบ</div>
+        <ul class="nav-list">
+          <li class="nav-item"><a href="osint-report.html"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> รายงาน OSINT Assessment</a></li>
+          <li class="nav-item"><a href="case-study.html"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> กรณีศึกษา Red vs Blue</a></li>
+          <li class="nav-item"><a href="operation-guide.html"><svg class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg> คู่มือการใช้งาน (Manual)</a></li>
+        </ul>
+      </div>
+
+      <div class="nav-section">
+        <div class="nav-section-title">ซอร์สโค้ดใน Repository</div>
+        <ul class="nav-list">
+          <li class="nav-item"><a href="https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator/tree/main/manager" target="_blank"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> /manager (FastAPI)</a></li>
+          <li class="nav-item"><a href="https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator/tree/main/worker" target="_blank"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> /worker (Stealth Bot)</a></li>
+          <li class="nav-item"><a href="https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator/tree/main/proxy-rotator" target="_blank"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> /proxy-rotator</a></li>
+          <li class="nav-item"><a href="https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator/tree/main/defense-demo" target="_blank"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> /defense-demo</a></li>
+          <li class="nav-item"><a href="https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator/tree/main/frontend" target="_blank"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> /frontend (Dashboard)</a></li>
+        </ul>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="page-header">
+        <h1 class="page-title">ระบบบริหารจัดการและส่วนควบคุม (Manager & Dashboards)</h1>
+        <p class="page-subtitle">ส่วนกระจายคำสั่งกลาง (Orchestration Engine), การควบคุมผ่าน Telegram Bot และหน้าจอ Admin Live Audit</p>
+      </div>
+
+      <!-- Manager Architecture -->
+      <div class="card">
+        <h2 style="font-size: 1.25rem; margin-bottom: 1rem; color: #fff;">โครงสร้างส่วนบริหารจัดการกลาง (Manager Microservice - <code>/manager</code>)</h2>
+        <div class="grid-2">
+          <div>
+            <h3 style="font-size: 1.05rem; color: var(--accent-purple); margin-bottom: 0.5rem;"><code>main.py</code> (Central Orchestration)</h3>
+            <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 0.8rem;">
+              ให้บริการ REST API และ WebSocket สำหรับคอยรับสถานะ Heartbeat จาก Workers ทั่วทั้งระบบ ควบคุมรอบภารกิจการยิงเปิดแมตช์ตั๋ว และรวบรวมตัวเลข Telemetry ส่งต่อไปยัง AI Fraud Engine
+            </p>
+          </div>
+          <div>
+            <h3 style="font-size: 1.05rem; color: var(--accent-cyan); margin-bottom: 0.5rem;"><code>telegram_bot.py</code> (Remote Operator Interface)</h3>
+            <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 0.8rem;">
+              อินเทอร์เฟซควบคุมระบบทางไกลผ่าน Telegram Application ช่วยให้ผู้บริหารระบบหรือ Security Operator สามารถสั่งรัน หยุด หรือตรวจสอบสถานะผ่านคำสั่งแชทได้ทันที
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Telegram Bot Command Table -->
+      <div class="card">
+        <h2 style="font-size: 1.25rem; margin-bottom: 1rem; color: #fff;">คำสั่งควบคุมระบบผ่าน Telegram Bot (Bot Command Suite)</h2>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>Telegram Command</th>
+                <th>Target Action</th>
+                <th>Response Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>/status</code></td>
+                <td>System Health Check</td>
+                <td>รายงานจำนวน Workers ที่ Active, อัตรา Success/Failure, สถานะ Redis และ Queue throughput</td>
+              </tr>
+              <tr>
+                <td><code>/start_wave &lt;event_id&gt;</code></td>
+                <td>Trigger Attack Wave</td>
+                <td>กระจายสัญญาณไปยัง Workers ทั้งหมดให้เริ่มยิง Concurrent Purchase Wave ไปยัง Event ที่กำหนด</td>
+              </tr>
+              <tr>
+                <td><code>/stop_all</code></td>
+                <td>Emergency Stop</td>
+                <td>ส่งคำสั่งหยุดภารกิจฉุกเฉินไปยัง Workers ทั้งหมดทันที</td>
+              </tr>
+              <tr>
+                <td><code>/proxies</code></td>
+                <td>Proxy Pool Status</td>
+                <td>แสดงจำนวน IP Proxy ที่ใช้งานได้ และอัตรา Latency เฉลี่ย</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 style="font-size: 1.1rem; color: #fff; margin: 1.5rem 0 0.75rem 0;">หน้าต่างอินเทอร์เฟซ Telegram Dashboard จริง</h3>
+        <div style="max-width: 650px;">
+          <div class="gallery-card">
+            <a href="assets/images/telegram_dashboard.jpg" target="_blank">
+              <img src="assets/images/telegram_dashboard.jpg" alt="Telegram Dashboard Interface" style="height: 240px;">
+            </a>
+            <div class="gallery-caption">
+              <h4>Telegram Dashboard UI</h4>
+              <p>ส่วนควบคุมและจัดการบอทแจ้งเตือน Telegram คอนโซล พร้อมคู่มือการสร้างและผูกกลุ่มแจ้งเตือน</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dashboards & Audit Views -->
+      <div class="card">
+        <h2 style="font-size: 1.25rem; margin-bottom: 1rem; color: #fff;">แดชบอร์ดติดตามสถานะและตรวจสอบความปลอดภัย (Dashboards)</h2>
+        <div class="grid-2">
+          <div style="background: rgba(255,255,255,0.02); padding: 1.2rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <h3 style="font-size: 1.1rem; color: var(--accent-blue); margin-bottom: 0.5rem;">1. Operational Dashboard (<code>http://localhost:5173</code>)</h3>
+            <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.6;">
+              หน้าจอหลักสำหรับฝั่งการทำงาน พัฒนาด้วย React + TypeScript แสดงผลสถานะการทำงานของ Workers แบบ Real-time, อัตราความสำเร็จในการล็อกที่นั่ง, ตำแหน่งคิวเฉลี่ย และการควบคุม Event Target
+            </p>
+          </div>
+
+          <div style="background: rgba(255,255,255,0.02); padding: 1.2rem; border-radius: 8px; border: 1px solid var(--border-color);">
+            <h3 style="font-size: 1.1rem; color: var(--accent-green); margin-bottom: 0.5rem;">2. Live Defense Audit Feed (<code>http://localhost:8090/admin</code>)</h3>
+            <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.6;">
+              หน้าจอสำหรับฝั่ง Blue Team แสดงผลสตรีมเหตุการณ์การตรวจจับของชั้นความปลอดภัยสด แยกสีตามชั้นการป้องกัน (IP Burst Block / Akamai Challenge / AI Fraud Block / 3DS Fail)
+            </p>
+          </div>
+        </div>
+
+        <h3 style="font-size: 1.1rem; color: #fff; margin: 1.5rem 0 0.75rem 0;">ภาพถ่ายหน้าจอส่วนควบคุมจริง (Defense Admin & Stealth Bot)</h3>
+        <div class="gallery-grid">
+          <div class="gallery-card">
+            <a href="assets/images/defense_admin_dashboard.jpg" target="_blank">
+              <img src="assets/images/defense_admin_dashboard.jpg" alt="TTM Defense Admin Dashboard">
+            </a>
+            <div class="gallery-caption">
+              <h4>TTM Defense Admin (Live Audit)</h4>
+              <p>หน้าจอบริหารจัดการสวิตช์ระบบความปลอดภัยและสตรีมบันทึกการผ่าน/ไม่ผ่านสด</p>
+            </div>
+          </div>
+
+          <div class="gallery-card">
+            <a href="assets/images/stealth_bot_dashboard.jpg" target="_blank">
+              <img src="assets/images/stealth_bot_dashboard.jpg" alt="Playwright Stealth Bot Control UI">
+            </a>
+            <div class="gallery-caption">
+              <h4>Playwright Stealth Bot Controller</h4>
+              <p>หน้าจอควบคุมบอทฝั่ง Offense สลับโหมด สั่งรัน/หยุด Workers</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        Ticketing Infrastructure Security Simulator &copy; 2026. Designed for Cybersecurity Research & Infrastructure Intelligence.
+      </footer>
+    </main>
+  </div>
+
+  <script src="assets/script.js"></script>
+</body>
+</html>
