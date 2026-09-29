@@ -28,18 +28,18 @@ export const BOT_MODE_META: Record<
 > = {
   queueit: {
     icon: '🎫',
-    title: 'Ticket Purchase / Queue-it',
+    title: 'Queue Flow (Lab)',
     short: 'queueit',
-    description: 'คิวจริง → เลือกที่นั่ง → เลือกจ่ายด้วย PromptPay → ส่งรูป QR Code ไป Telegram ทันที',
+    description: 'ทดลองคิวและการเลือกที่นั่งกับ defense gateway ภายใน lab',
     accent: 'from-emerald-500/20 to-cyan-500/10',
     ring: 'ring-emerald-500',
-    badge: 'โปรดักชัน',
+    badge: 'Lab',
   },
   defense_demo: {
     icon: '🛡️',
     title: 'Defense Demo Sandbox',
     short: 'defense_demo',
-    description: 'ทดสอบห้องรอ / anti-bot ใน sandbox ก่อนงานจริง',
+    description: 'ทดสอบห้องรอและมาตรการป้องกันใน sandbox',
     accent: 'from-violet-500/20 to-fuchsia-500/10',
     ring: 'ring-violet-500',
     badge: 'ทดสอบ',
@@ -47,8 +47,7 @@ export const BOT_MODE_META: Record<
 };
 
 export const MODE_CATEGORIES: { label: string; hint: string; modes: BotMode[] }[] = [
-  { label: 'จองบัตรจริง', hint: 'Ticket + Queue-it', modes: ['queueit'] },
-  { label: 'ทดสอบระบบ', hint: 'Sandbox', modes: ['defense_demo'] },
+  { label: 'ห้องทดลอง', hint: 'Defense Gateway', modes: ['defense_demo', 'queueit'] },
 ];
 
 export const SETUP_TAB_LABELS: Record<SetupTabId, string> = {
@@ -57,7 +56,7 @@ export const SETUP_TAB_LABELS: Record<SetupTabId, string> = {
   proxies: '🌐 Proxies',
   profiles: '👤 Buyers',
   browser: '🛡️ Browser',
-  Ticket: '🎫 Ticket Purchase',
+  ticket: '🎫 Ticket Purchase',
 };
 
 export const MODE_GUIDE: Record<BotMode, ModeGuideEntry> = {

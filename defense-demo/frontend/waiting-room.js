@@ -21,7 +21,7 @@
   };
 
   const now = Date.now();
-  let saleStartMs = parseInt(localStorage.getItem("ticket_sale_start_ms") || "0", 10) || now + 5 * 60 * 1000;
+  let saleStartMs = parseInt(localStorage.getItem("ticket_sale_start_ms") || "0", 10) || now + (isDemo ? 8000 : 5 * 60 * 1000);
 
   if (!localStorage.getItem("ticket_sale_start_ms")) {
     localStorage.setItem("ticket_sale_start_ms", String(saleStartMs));

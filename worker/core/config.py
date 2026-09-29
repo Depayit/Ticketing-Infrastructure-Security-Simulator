@@ -1,5 +1,6 @@
 import os
 import json
+from urllib.parse import urlparse
 import redis
 import telegram
 from typing import Dict, List, Optional
@@ -59,6 +60,21 @@ def load_config(r: redis.Redis) -> dict:
     if cfg:
         return cfg
     return _load_config_from_file()
+
+
+def is_lab_target(url: str) -> bool:
+    """Accept only the local defense gateway as a browser target."""
+    try:
+        parsed = urlparse(url or "")
+        return (
+            parsed.scheme == "http"
+            and parsed.hostname in {"defense-gateway", "localhost", "127.0.0.1"}
+            and parsed.port in {None, 8090}
+            and not parsed.username
+            and not parsed.password
+        )
+    except (TypeError, ValueError):
+        return False
 
 def get_tg_bot_instances(config: dict) -> List[tuple[telegram.Bot, str]]:
     global _tg_bots_cache

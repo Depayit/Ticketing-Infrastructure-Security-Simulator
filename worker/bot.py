@@ -74,7 +74,9 @@ class TicketWorker:
         self.proxies: List[str] = config.get("proxies", [])
         self.profiles: List[Dict] = config.get("profiles", [])
         self.ticket_priorities: List[str] = config.get("ticket_priorities", ["VIP", "GA", "Standing"])
-        self.membership_code: str = config.get("membership_code", "")
+        self.membership_code: str = config.get("membership_code") or (
+            "LAB-DEMO" if self.bot_mode == "defense_demo" else ""
+        )
         
         self.browser_profiles: List[Dict] = config.get("browser_profiles", [])
         self.proxy_rotator_url: str = os.environ.get("PROXY_ROTATOR_URL") or config.get("proxy_rotator_url", "http://proxy-rotator:8080")
@@ -260,7 +262,7 @@ class TicketWorker:
     async def set_global_stop(self):
         r.set("ticket:global_stop", "1", ex=7200)
         r.incr("ticket:success_count")
-        await self.send_log("🚨 ได้บัตรสำเร็จ! สั่งหยุดทุก worker แล้ว", "SUCCESS")
+        await self.send_log("ล็อกที่นั่งใน lab สำเร็จ; สั่งหยุด worker อื่นแล้ว", "SUCCESS")
 
     async def _live_stream_task(self, page):
         import base64
@@ -414,6 +416,20 @@ class TicketWorker:
             return {"current_scroll_y": 0, "page_height": 0, "viewport_height": 0, "is_scrollable": False}
 
     async def _qi_smart_seat_selection(self, page, behavior) -> bool:
+        if self.bot_mode == "defense_demo" and "/seats" in page.url:
+            try:
+                await page.locator("input[name='show-date']").first.check(timeout=5000)
+                seat = page.locator("#seats .seat.available").first
+                await seat.wait_for(state="visible", timeout=5000)
+                await seat.click(timeout=5000)
+                await page.locator("#btn-checkout").click(timeout=5000)
+                await page.wait_for_url("**/checkout", timeout=12000)
+                await self.send_log("เลือกโซนและล็อกที่นั่งผ่านหน้า demo แล้ว", "SUCCESS")
+                return True
+            except Exception as exc:
+                await self.send_log(f"หน้า demo ยังล็อกที่นั่งไม่สำเร็จ: {exc}", "WARN")
+                return False
+
         await self._qi_select_show_date(page, behavior)
         await asyncio.sleep(random.uniform(0.3, 0.6))
 
@@ -499,6 +515,11 @@ class TicketWorker:
             await asyncio.sleep(5)
             self._refresh_config()
 
+        if not core.config.is_lab_target(self.target_url):
+            self.update_status("FAILED")
+            await self.send_log("Target URL ต้องเป็น defense gateway ภายใน lab", "ERROR")
+            return
+
         proxy_str = self.proxies[0] if self.proxies else None
         proxy_cfg = self._parse_playwright_proxy(proxy_str) if proxy_str else None
         seed = proxy_str or self.instance_id
@@ -512,6 +533,13 @@ class TicketWorker:
             browser_instance, context, page = await browser.context.create_stealth_browser(
                 p, self.qi_headless, proxy_str, fp, viewport, stealth_js
             )
+            async def lab_route(route):
+                if core.config.is_lab_target(route.request.url):
+                    await route.continue_()
+                else:
+                    await route.abort()
+
+            await context.route("**/*", lab_route)
             asyncio.create_task(self._live_stream_task(page))
             behavior = stealth.HumanBehavior(seed, viewport)
             deadline = time.time() + self.qi_max_minutes * 60
@@ -533,6 +561,18 @@ class TicketWorker:
 
                     if await self._try_human_verification(page, behavior):
                         continue
+
+                    if self.bot_mode == "defense_demo":
+                        login = page.locator("#phase-login")
+                        if await login.count() and await login.is_visible():
+                            self.update_status("LAB_LOGIN", page.url)
+                            await page.locator("#login-email").fill("lab-user@example.test")
+                            await page.locator("#login-password").fill("lab-only-password")
+                            await page.locator("#login-captcha").check()
+                            await page.locator("#login-form button[type='submit']").click()
+                            await self.send_log("เข้าสู่ระบบบัญชีจำลองใน lab แล้ว", "INFO")
+                            await asyncio.sleep(1)
+                            continue
 
                     # Highest priority: never get dropped by the inactivity modal.
                     if await self._qi_click_text(page, behavior, self.qi_stillhere_texts, wait_hidden=True):
@@ -610,7 +650,9 @@ class TicketWorker:
                         body_lower = ""
 
                     is_payment_page = False
-                    if not any(k in url_l for k in ("/seats", "booking")):
+                    if self.bot_mode == "defense_demo" and "/checkout" in url_l:
+                        is_payment_page = True
+                    elif not any(k in url_l for k in ("/seats", "booking")):
                         if any(k in url_l for k in ("checkout", "cart", "payment", "order", "2c2p")) or any(k in body_lower for k in (
                             "checkout", "ชำระเงิน", "บัตรเครดิต", "payment",
                             "ยืนยันการสั่งซื้อ", "order summary", "สรุปคำสั่งซื้อ",
@@ -655,7 +697,12 @@ class TicketWorker:
                         if self.qi_stop_on_first:
                             await self.set_global_stop()
                         await self.send_log(f"⌛ คงเซสชันไว้ {self.qi_hold_seconds}s เพื่อให้จ่ายเงินต่อ...", "INFO")
-                        await asyncio.sleep(self.qi_hold_seconds)
+                        hold_deadline = time.monotonic() + self.qi_hold_seconds
+                        while time.monotonic() < hold_deadline:
+                            if not await self.is_running() or await self.is_worker_stopped():
+                                await self.send_log("หยุดการคงหน้า checkout ตามคำสั่ง Stop", "INFO")
+                                break
+                            await asyncio.sleep(1)
                         break
 
                     # Check for Registration Page

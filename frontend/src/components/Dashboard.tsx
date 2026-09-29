@@ -156,6 +156,7 @@ function LiveViewModal({ instanceId, onClose }: { instanceId: string; onClose: (
 interface ConfigSnapshot {
   bot_mode?: string;
   target_url?: string;
+  official_event_url?: string;
   telegram_token?: string;
   telegram_chat_id?: string;
   click_selector?: string;
@@ -163,6 +164,21 @@ interface ConfigSnapshot {
   profiles?: unknown[];
   browser_profiles?: unknown[];
   defense_demo?: { default_url?: string };
+}
+
+function officialBookingUrl(value?: string): string {
+  const fallback = 'https://www.thaiticketmajor.com/';
+  try {
+    const url = new URL(value || fallback);
+    if (
+      url.protocol === 'https:' &&
+      ['thaiticketmajor.com', 'www.thaiticketmajor.com', 'booking.thaiticketmajor.com'].includes(url.hostname) &&
+      !url.port && !url.username && !url.password
+    ) return url.href;
+  } catch {
+    // Fall back to the official home page for stale or invalid saved data.
+  }
+  return fallback;
 }
 
 export default function Dashboard({ onOpenSetup }: { onOpenSetup?: () => void }) {
@@ -273,6 +289,14 @@ export default function Dashboard({ onOpenSetup }: { onOpenSetup?: () => void })
             <p className="text-sm text-cyan-400 break-all max-w-full font-mono">
               🎯 Target: {status.target_url || status.event_id || 'ยังไม่ได้ตั้งค่า'}
             </p>
+            <a
+              href={officialBookingUrl(configSnap.official_event_url)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="self-start text-sm font-semibold text-emerald-300 underline hover:text-emerald-200"
+            >
+              เปิดหน้า ThaiTicketMajor เพื่อจองด้วยตนเอง ↗
+            </a>
             <div className="text-[10px] text-emerald-400/70 font-mono">
               Advanced Fingerprint + Human Behavior (browser-only)
             </div>

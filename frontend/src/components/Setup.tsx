@@ -72,6 +72,7 @@ interface Config {
   bot_mode?: string;
   event_id: string;
   target_url?: string;
+  official_event_url?: string;
   proxies_per_worker?: number;
   click_selector?: string;
   refresh_mode?: 'auto_refresh' | 'dom_watch';
@@ -255,9 +256,10 @@ export default function Setup() {
   const [showStealthDetails, setShowStealthDetails] = useState(false);
   const [showInfra, setShowInfra] = useState(false);
   const [config, setConfig] = useState<Config>({
-    bot_mode: 'queueit',
+    bot_mode: 'defense_demo',
     event_id: '',
-    target_url: '',
+    target_url: 'http://defense-gateway:8090/?demo=1',
+    official_event_url: 'https://www.thaiticketmajor.com/',
     proxies_per_worker: 0,
     click_selector: 'button:has-text("Add to Cart"), button:has-text("ซื้อเลย"), button:has-text("ใส่ตะกร้า")',
     refresh_mode: 'auto_refresh',
@@ -495,6 +497,19 @@ export default function Setup() {
               showAllModes={false}
               compact
             />
+
+            <div className="bg-zinc-800/40 border border-zinc-700/60 rounded-xl p-6 space-y-3">
+              <h3 className="text-lg font-semibold text-zinc-100">เว็บไซต์จองบัตรจริง</h3>
+              <p className="text-sm text-zinc-400">บันทึกลิงก์อีเวนต์ของ ThaiTicketMajor เพื่อเปิดในเบราว์เซอร์และจองด้วยบัญชีของคุณเอง worker ไม่ใช้ลิงก์นี้เป็นเป้าหมาย</p>
+              <input
+                type="url"
+                aria-label="ลิงก์อีเวนต์ ThaiTicketMajor"
+                value={config.official_event_url || ''}
+                onChange={(e) => setConfig({ ...config, official_event_url: e.target.value })}
+                placeholder="https://www.thaiticketmajor.com/"
+                className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-4 py-3 text-zinc-100"
+              />
+            </div>
 
             {/* Mode-specific settings */}
             <div className="bg-zinc-800/40 border border-zinc-700/60 rounded-xl p-6 space-y-5">

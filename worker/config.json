@@ -37,8 +37,8 @@
                               "GA",
                               "Standing"
                           ],
-    "bot_mode":  "queueit",
-    "target_url":  "https://www.example-ticket.com/concert/your-event-here",
+    "bot_mode":  "defense_demo",
+    "target_url":  "http://defense-gateway:8090/?demo=1",
     "queueit":  {
                     "headless":  true,
                     "manual_takeover": false,
@@ -56,5 +56,5 @@
                     "auto_scroll_for_buttons": true,
                     "max_scroll_search_px": 3000
                 },
-    "membership_code": ""
+    "membership_code": "LAB-DEMO"
 }

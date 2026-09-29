@@ -143,6 +143,36 @@ Detailed interactive guides are provided in the [`docs-html/`](file:///c:/dev/Ti
 
 ## Quick Start Guide
 
+The current runnable setup is a local research lab. The manager and worker accept
+the defense gateway (`http://defense-gateway:8090`) as the booking target. Start
+the root stack first so it creates the shared `ticketing-lab` Docker network,
+then start the defense stack:
+
+```bash
+docker compose up -d --build redis proxy-rotator manager worker
+docker compose -f defense-demo/docker-compose.defense.yml up -d --build
+```
+
+Open the manager at `http://localhost:8080/` and the defense gateway at
+`http://localhost:8090/?demo=1`. The manager runs in local `DEV_MODE` and is
+published only on the loopback interface. It starts with one worker; increase
+the count with `docker compose up -d --scale worker=2` after a single worker
+run succeeds. Use simulated accounts and payment data only.
+
+The worker's `target_url` defaults to the defense gateway. If Redis contains an
+older configuration, update it in the dashboard before starting a run. The
+manager rejects external target URLs and the worker also checks each browser
+request. External fonts and images on the demo pages may therefore be absent
+in worker screenshots.
+
+For a real ThaiTicketMajor booking with an ordinary customer account, save the
+official event URL in the dashboard's **เว็บไซต์จองบัตรจริง** field and use the
+**เปิดหน้า ThaiTicketMajor เพื่อจองด้วยตนเอง** link. This opens the official site
+in a separate browser tab for manual sign-in, seat selection, and checkout. The
+saved URL is separate from the lab `target_url`; it is never used as a worker
+destination. Direct booking integration requires a provider-authorized API and
+credentials that are not included in a customer account.
+
 ### 1. Prerequisites
 * [Docker](https://www.docker.com/) & Docker Compose
 * [Node.js](https://nodejs.org/) (v18+ for local frontend dashboard)
@@ -151,7 +181,7 @@ Detailed interactive guides are provided in the [`docs-html/`](file:///c:/dev/Ti
 ### 2. Start Defense & Manager Infrastructure
 ```bash
 # 1. Start Manager, Redis, Proxy Rotator, and Worker pool
-docker compose up -d --build
+docker compose up -d --build redis proxy-rotator manager worker
 
 # 2. Start Defense Simulation Stack (Gateway, Queue, Seats, Payment, Fraud Engine)
 docker compose -f defense-demo/docker-compose.defense.yml up -d --build
