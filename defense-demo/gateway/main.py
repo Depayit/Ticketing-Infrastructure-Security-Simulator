@@ -1,4 +1,5 @@
 import json
+import hashlib
 import sys
 import time
 from pathlib import Path
@@ -7,7 +8,7 @@ from typing import Any, Dict, Optional
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -57,13 +58,16 @@ except Exception:
     def format_bm_sv(*a, **k): return "bm_sv_stub"  # type: ignore
 
 from shared.config import (
+    AUTH_SESSION_TTL_SEC,
     DEFAULT_EVENT_ID,
     DEFAULT_EVENT_NAME,
     PAYMENT_SERVICE_URL,
-    PURCHASE_LIMIT_MINUTES,
     QUEUE_SERVICE_URL,
     SEAT_SERVICE_URL,
     SENSOR_SESSION_TTL_SEC,
+    WORKFLOW_CONFIG_KEY,
+    WORKFLOW_DEFAULTS,
+    normalize_workflow,
 )
 try:
     from shared.events import clear_all_defense_data, get_audit_events, log_event, summarize_audit_events, reset_seats_and_sessions
@@ -76,11 +80,15 @@ except Exception:
     if 'log_event' not in dir():
         from shared.events import log_event  # type: ignore
 from shared.redis_client import r
+from shared.workflow import (
+    GATE_POSITIONS, auth_user, captcha_passed, captcha_required,
+    create_auth, get_workflow, new_challenge, verify_challenge,
+)
 
 app = FastAPI(title="Defense Gateway")
-app.add_middleware(EdgeCDNMiddleware)
-app.add_middleware(BotBypassBlockMiddleware)
 app.add_middleware(WAFMiddleware)
+app.add_middleware(BotBypassBlockMiddleware)
+app.add_middleware(EdgeCDNMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -108,11 +116,80 @@ def client_ip(request: Request) -> str:
 
 
 def session_id_from_request(request: Request) -> str:
-    return request.headers.get("x-session-id", "") or request.cookies.get("defense_sid", "")
+    return request.cookies.get("defense_sid", "") or request.headers.get("x-session-id", "")
 
 
 def sensor_session_key(session_id: str) -> str:
     return f"defense:sensor:{session_id}"
+
+
+def current_user(request: Request) -> Optional[str]:
+    return auth_user(request.cookies.get("defense_auth", ""), session_id_from_request(request))
+
+
+def _login_required(workflow: dict, position: str) -> bool:
+    return bool(workflow.get({
+        "queue": "REQUIRE_LOGIN_BEFORE_QUEUE",
+        "seat": "REQUIRE_LOGIN_BEFORE_SEAT",
+        "lock": "REQUIRE_LOGIN_BEFORE_LOCK",
+    }.get(position, ""), False))
+
+
+def _gate_status(request: Request, position: str, event_id: str = DEFAULT_EVENT_ID) -> Optional[dict]:
+    workflow = get_workflow_config()
+    session_id = session_id_from_request(request)
+    captcha_configured = workflow["CAPTCHA_POSITION"] in (position, "random")
+    if (_login_required(workflow, position) or captcha_configured) and not r.get(sensor_session_key(session_id)):
+        return {"status": "need_sensor", "position": position}
+    if _login_required(workflow, position) and not current_user(request):
+        log_event("login", "login_required", session_id, client_ip(request), {"position": position}, blocked=True)
+        return {"status": "need_login", "position": position}
+    if captcha_required(workflow, session_id, event_id, position, _sensor_meta(session_id).get("bot_score", 60)):
+        if not captcha_passed(session_id, event_id, position):
+            log_event("captcha", "captcha_required", session_id, client_ip(request), {"position": position}, blocked=True)
+            return {"status": "need_captcha", "position": position}
+    return None
+
+
+def _gate_response(request: Request, position: str, event_id: str = DEFAULT_EVENT_ID) -> Optional[JSONResponse]:
+    gate = _gate_status(request, position, event_id)
+    return JSONResponse(gate, status_code=428) if gate else None
+
+
+def active_event_id() -> str:
+    raw = r.get("defense:config:event")
+    return json.loads(raw).get("eventId", DEFAULT_EVENT_ID) if raw else DEFAULT_EVENT_ID
+
+
+def cart_event_id(cart_id: str) -> str:
+    raw = r.get(f"defense:cart:{cart_id}") if cart_id else None
+    return json.loads(raw).get("event_id", active_event_id()) if raw else active_event_id()
+
+
+def _page_gate_redirect(gate: dict, next_path: str) -> RedirectResponse:
+    if gate["status"] == "need_sensor":
+        return RedirectResponse("/", status_code=303)
+    target = "/login" if gate["status"] == "need_login" else "/captcha"
+    query = "next=" + next_path
+    if gate["status"] == "need_captcha":
+        query += "&position=" + gate["position"]
+    return RedirectResponse(f"{target}?{query}", status_code=303)
+
+
+def _bound_token_gate(request: Request, token: str) -> Optional[JSONResponse]:
+    workflow = get_workflow_config()
+    if not any(workflow[key] for key in (
+        "REQUIRE_LOGIN_BEFORE_QUEUE", "REQUIRE_LOGIN_BEFORE_SEAT", "REQUIRE_LOGIN_BEFORE_LOCK"
+    )):
+        return None
+    raw = r.get("defense:token:" + hashlib.sha256(token.encode()).hexdigest()[:16]) if token else None
+    meta = json.loads(raw) if raw else {}
+    if (not meta or not current_user(request) or meta.get("user_id") != current_user(request)
+            or meta.get("session_id") != session_id_from_request(request)
+            or meta.get("ip") != client_ip(request)):
+        log_event("login", "token_binding_failed", session_id_from_request(request), client_ip(request), blocked=True)
+        return JSONResponse({"status": "denied", "error": "QUEUE_TOKEN_BIND_MISMATCH"}, status_code=403)
+    return None
 
 
 def parse_graphql(body: dict) -> tuple[str, dict]:
@@ -197,14 +274,17 @@ def admin_reset_seats():
 
 class SaleStartRequest(BaseModel):
     delay_seconds: int
+    soft_open_seconds: int = 0
 
 @app.post("/admin/api/set-sale-start")
 async def admin_set_sale_start(req: SaleStartRequest, request: Request):
     """Set the sale start time (pre-queue countdown)."""
     start_time = time.time() + req.delay_seconds
     r.set("defense:config:sale_start", str(start_time))
-    log_event("edge", "admin_set_sale_start", "", client_ip(request), {"start_time": start_time}, blocked=False)
-    return {"success": True, "sale_start": start_time}
+    r.set("defense:config:soft_open_seconds", str(max(0, req.soft_open_seconds)))
+    log_event("edge", "admin_set_sale_start", "", client_ip(request), {"start_time": start_time,
+                                                                         "soft_open_seconds": req.soft_open_seconds}, blocked=False)
+    return {"success": True, "sale_start": start_time, "soft_open_seconds": req.soft_open_seconds}
 
 class SimulationRequest(BaseModel):
     enabled: bool
@@ -216,14 +296,20 @@ async def admin_set_simulation(req: SimulationRequest, request: Request):
     log_event("edge", "admin_set_simulation", "", client_ip(request), {"enabled": req.enabled}, blocked=False)
     return {"success": True, "enabled": req.enabled}
 
+def get_workflow_config() -> dict:
+    return get_workflow()
+
+
 @app.get("/api/event-config")
 def get_event_config():
     raw = r.get("defense:config:event")
     if raw:
-        return json.loads(raw)
+        event = json.loads(raw)
+        event["workflow"] = get_workflow_config()
+        return event
     return {
-        "eventId": "bts-arirang-2026",
-        "eventName": "BTS WORLD TOUR 'ARIRANG' IN BANGKOK",
+        "eventId": DEFAULT_EVENT_ID,
+        "eventName": DEFAULT_EVENT_NAME,
         "maxTicketsPerAccount": 4,
         "zones": [
             {"id": "VIP", "name": "VIP (V1-V16)", "price": 7800, "color": "#c084fc", "isRestricted": False},
@@ -233,14 +319,14 @@ def get_event_config():
             {"id": "YELLOW", "name": "Yellow/Orange Zone", "price": 5300, "color": "#eab308", "isRestricted": False},
             {"id": "GREEN", "name": "Green Zone", "price": 4300, "color": "#22c55e", "isRestricted": False},
             {"id": "TEAL", "name": "Teal/Light Blue Zone", "price": 3300, "color": "#14b8a6", "isRestricted": False}
-        ]
+        ],
+        "workflow": get_workflow_config(),
     }
 
 
 def get_defense_toggles() -> dict:
     raw = r.get("defense:config:toggles")
-    if raw:
-        return json.loads(raw)
+    toggles = json.loads(raw) if raw else {}
     return {
         "waf": True,
         "akamai": True,
@@ -248,9 +334,33 @@ def get_defense_toggles() -> dict:
         "graphql": False,
         "queue": True,
         "three_ds": True,
-        "bot_simulation": r.get("defense:config:bot_simulation") in [b"1", "1"]
-
+        **toggles,
+        "bot_simulation": r.get("defense:config:bot_simulation") in [b"1", "1"],
+        **get_workflow_config(),
     }
+
+
+@app.get("/metrics")
+def metrics():
+    def label(value: str) -> str:
+        return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+
+    lines = ["# TYPE defense_events_total counter"]
+    for field, count in r.hgetall("defense:metrics:events").items():
+        layer, action, blocked = field.split("|", 2)
+        lines.append(f'defense_events_total{{layer="{label(layer)}",action="{label(action)}",blocked="{blocked}"}} {int(count)}')
+    lines.extend([
+        "# TYPE defense_admit_time_milliseconds_sum counter",
+        f'defense_admit_time_milliseconds_sum {int(r.get("defense:metric:admit_time_ms_sum") or 0)}',
+        "# TYPE defense_admit_time_count counter",
+        f'defense_admit_time_count {int(r.get("defense:metric:admit_time_count") or 0)}',
+        "# TYPE defense_hold_expired_total counter",
+        f'defense_hold_expired_total {int(r.get("defense:metric:hold_expired_total") or 0)}',
+        "# TYPE defense_waiting_room_size gauge",
+    ])
+    waiting = sum(r.zcard(key) for key in r.scan_iter(match="defense:waiting:*:rank"))
+    lines.append(f"defense_waiting_room_size {waiting}")
+    return PlainTextResponse("\n".join(lines) + "\n", media_type="text/plain; version=0.0.4")
 
 
 @app.get("/api/defense-toggles")
@@ -261,32 +371,71 @@ def get_toggles_api():
 @app.post("/api/defense-toggles")
 async def update_toggles_api(request: Request):
     data = await request.json()
-    r.set("defense:config:toggles", json.dumps(data))
-    log_event("edge", "admin_update_toggles", "", client_ip(request), data, blocked=False)
-    return {"success": True, "toggles": data}
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=422, detail="toggles must be an object")
+    workflow_input = {key: value for key, value in data.items() if key in WORKFLOW_DEFAULTS}
+    toggle_input = {key: value for key, value in data.items() if key not in WORKFLOW_DEFAULTS}
+    allowed = {"waf", "akamai", "bot_bypass", "graphql", "queue", "three_ds", "bot_simulation"}
+    if set(toggle_input) - allowed or any(type(value) is not bool for value in toggle_input.values()):
+        raise HTTPException(status_code=422, detail="invalid defense toggle")
+    old_workflow = get_workflow_config()
+    try:
+        workflow = normalize_workflow(workflow_input, old_workflow)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    toggles = {key: value for key, value in get_defense_toggles().items() if key in allowed}
+    toggles.update(toggle_input)
+    pipe = r.pipeline()
+    pipe.set("defense:config:toggles", json.dumps(toggles))
+    pipe.set(WORKFLOW_CONFIG_KEY, json.dumps(workflow))
+    if workflow["QUEUE_MODE"] != old_workflow["QUEUE_MODE"]:
+        waiting_keys = list(r.scan_iter(match="defense:waiting:*"))
+        if waiting_keys:
+            pipe.delete(*waiting_keys)
+    if any(workflow[key] != old_workflow[key] for key in ("CAPTCHA_POSITION", "CAPTCHA_RANDOM_RATE")):
+        pipe.incr("defense:config:captcha_version")
+    if "bot_simulation" in toggle_input:
+        pipe.set("defense:config:bot_simulation", "1" if toggle_input["bot_simulation"] else "0")
+    pipe.execute()
+    result = {**toggles, **workflow}
+    log_event("edge", "admin_update_toggles", "", client_ip(request), result, blocked=False)
+    return {"success": True, "toggles": result}
 
 
 @app.post("/api/event-config")
 async def update_event_config(request: Request):
     data = await request.json()
-    r.set("defense:config:event", json.dumps(data))
-    log_event("edge", "admin_update_event_config", "", client_ip(request), data, blocked=False)
-    return {"success": True, "config": data}
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=422, detail="event config must be an object")
+    workflow_input = data.pop("workflow", None)
+    old_workflow = get_workflow_config()
+    workflow = old_workflow
+    if workflow_input is not None:
+        try:
+            workflow = normalize_workflow(workflow_input, old_workflow)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+    event = get_event_config()
+    event.pop("workflow", None)
+    event.update(data)
+    pipe = r.pipeline()
+    pipe.set("defense:config:event", json.dumps(event))
+    pipe.set(WORKFLOW_CONFIG_KEY, json.dumps(workflow))
+    if workflow["QUEUE_MODE"] != old_workflow["QUEUE_MODE"]:
+        waiting_keys = list(r.scan_iter(match="defense:waiting:*"))
+        if waiting_keys:
+            pipe.delete(*waiting_keys)
+    if any(workflow[key] != old_workflow[key] for key in ("CAPTCHA_POSITION", "CAPTCHA_RANDOM_RATE")):
+        pipe.incr("defense:config:captcha_version")
+    pipe.execute()
+    result = {**event, "workflow": workflow}
+    log_event("edge", "admin_update_event_config", "", client_ip(request), result, blocked=False)
+    return {"success": True, "config": result}
 
 
 @app.get("/admin")
 def admin():
     return FileResponse(str(FRONTEND / "admin.html"))
-
-
-@app.get("/api/event-config")
-def event_config():
-    return {
-        "event_id": "bts-arirang-2026",
-        "event_name": "BTS WORLD TOUR 'ARIRANG' IN BANGKOK",
-        "purchase_limit_minutes": PURCHASE_LIMIT_MINUTES,
-        "sensor_file_hash": "a3f8c2e9",
-    }
 
 
 @app.post("/api/sensor")
@@ -379,18 +528,120 @@ async def challenge_pass(request: Request):
     return resp
 
 
+@app.get("/login")
+def login_page():
+    return FileResponse(str(FRONTEND / "login.html"))
+
+
+@app.get("/captcha")
+def captcha_page():
+    return FileResponse(str(FRONTEND / "captcha.html"))
+
+
+@app.get("/api/auth/session")
+def auth_session(request: Request):
+    user_id = current_user(request)
+    return {"authenticated": bool(user_id), "user_id": user_id}
+
+
+@app.post("/api/auth/login")
+async def auth_login(request: Request):
+    body = await request.json()
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=422, detail="INVALID_LOGIN_REQUEST")
+    email = str(body.get("email", "")).strip().lower()
+    password = str(body.get("password", ""))
+    session_id = session_id_from_request(request)
+    if not session_id or not r.get(sensor_session_key(session_id)):
+        raise HTTPException(status_code=401, detail="SENSOR_SESSION_REQUIRED")
+    if not email or "@" not in email or not password:
+        raise HTTPException(status_code=422, detail="EMAIL_AND_PASSWORD_REQUIRED")
+    user_id = hashlib.sha256(email.encode()).hexdigest()[:24]
+    queue_token = str(body.get("queue_token", ""))
+    if queue_token:
+        token_key = "defense:token:" + hashlib.sha256(queue_token.encode()).hexdigest()[:16]
+        raw = r.get(token_key)
+        if not raw:
+            raise HTTPException(status_code=403, detail="INVALID_QUEUE_TOKEN")
+        meta = json.loads(raw)
+        if (meta.get("session_id") != session_id or meta.get("ip") != client_ip(request)
+                or (meta.get("user_id") and meta["user_id"] != user_id)):
+            raise HTTPException(status_code=403, detail="QUEUE_TOKEN_BIND_MISMATCH")
+        r.set(token_key, json.dumps({**meta, "user_id": user_id}), keepttl=True)
+    auth_token, user_id = create_auth(email, session_id)
+    response = JSONResponse({"ok": True, "user_id": user_id})
+    response.set_cookie("defense_auth", auth_token, max_age=AUTH_SESSION_TTL_SEC, httponly=True,
+                        secure=request.url.scheme == "https", samesite="lax")
+    log_event("login", "login_success", session_id, client_ip(request), {"user_id": user_id})
+    return response
+
+
+@app.post("/api/auth/logout")
+def auth_logout(request: Request):
+    token = request.cookies.get("defense_auth", "")
+    if token:
+        from shared.workflow import auth_key
+        r.delete(auth_key(token))
+    response = JSONResponse({"ok": True})
+    response.delete_cookie("defense_auth")
+    return response
+
+
+@app.get("/api/captcha/challenge")
+def captcha_challenge(request: Request, position: str, event_id: str = DEFAULT_EVENT_ID):
+    if position not in GATE_POSITIONS:
+        raise HTTPException(status_code=422, detail="INVALID_POSITION")
+    session_id = session_id_from_request(request)
+    if not session_id or not r.get(sensor_session_key(session_id)):
+        raise HTTPException(status_code=401, detail="SENSOR_SESSION_REQUIRED")
+    workflow = get_workflow_config()
+    if not captcha_required(workflow, session_id, event_id, position, _sensor_meta(session_id).get("bot_score", 60)):
+        return {"required": False, "position": position}
+    if captcha_passed(session_id, event_id, position):
+        return {"required": False, "position": position}
+    return {"required": True, **new_challenge(session_id, event_id, position)}
+
+
+@app.post("/api/captcha/verify")
+async def captcha_verify(request: Request):
+    body = await request.json()
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=422, detail="INVALID_CAPTCHA_REQUEST")
+    position = body.get("position", "")
+    event_id = body.get("event_id") or DEFAULT_EVENT_ID
+    session_id = session_id_from_request(request)
+    if position not in GATE_POSITIONS or not session_id:
+        raise HTTPException(status_code=422, detail="INVALID_CAPTCHA_REQUEST")
+    if not verify_challenge(session_id, event_id, position, body.get("answer", "")):
+        log_event("captcha", "captcha_failed", session_id, client_ip(request), {"position": position}, blocked=True)
+        raise HTTPException(status_code=403, detail="CAPTCHA_FAILED")
+    log_event("captcha", "captcha_passed", session_id, client_ip(request), {"position": position})
+    return {"ok": True, "position": position}
+
+
 @app.get("/member-code")
-def member_code_page():
+def member_code_page(request: Request):
+    gate = _gate_status(request, "booking", active_event_id())
+    if not gate and _login_required(get_workflow_config(), "seat") and not current_user(request):
+        gate = {"status": "need_login", "position": "seat"}
+    if gate:
+        return _page_gate_redirect(gate, "/member-code")
     return FileResponse(str(FRONTEND / "member-code.html"))
 
 
 @app.get("/seats")
-def seats_page():
+def seats_page(request: Request):
+    gate = _gate_status(request, "seat", active_event_id())
+    if gate:
+        return _page_gate_redirect(gate, "/seats")
     return FileResponse(str(FRONTEND / "seat-map.html"))
 
 
 @app.get("/checkout")
-def checkout_page():
+def checkout_page(request: Request):
+    gate = _gate_status(request, "checkout", active_event_id())
+    if gate:
+        return _page_gate_redirect(gate, "/checkout")
     return FileResponse(str(FRONTEND / "checkout.html"))
 
 
@@ -406,6 +657,21 @@ def index():
     return FileResponse(str(FRONTEND / "waiting-room.html"))
 
 
+@app.get("/m")
+def mobile_index():
+    return RedirectResponse("/?mobile=1", status_code=307)
+
+
+@app.get("/m/seats")
+def mobile_seats():
+    return RedirectResponse("/seats?mobile=1", status_code=307)
+
+
+@app.get("/m/checkout")
+def mobile_checkout():
+    return RedirectResponse("/checkout?mobile=1", status_code=307)
+
+
 def _sensor_meta(session_id: str) -> Dict[str, Any]:
     raw = r.get(sensor_session_key(session_id))
     if not raw:
@@ -419,6 +685,7 @@ async def _handle_queue_status(
     session_id: str,
     event_id: str,
     join_queue: bool,
+    auth_token: str = "",
 ) -> dict:
     sm = _sensor_meta(session_id)
     resp = await client.post(
@@ -430,11 +697,14 @@ async def _handle_queue_status(
             "bot_score": sm.get("bot_score", 50),
             "fingerprint": sm.get("fingerprint", session_id),
             "join_queue": join_queue,
+            "auth_token": auth_token,
         },
     )
     data = resp.json()
     return {
         "status": data.get("status"),
+        "reason": data.get("reason"),
+        "position": data.get("position"),
         "token": data.get("token", ""),
         "captchaSitekey": data.get("captchaSitekey", ""),
         "queuePosition": data.get("queuePosition"),
@@ -465,8 +735,11 @@ async def _handle_add_to_cart(
             "session_id": session_id,
             "api_only": not bool(r.get(f"defense:telemetry:{session_id}")),
             "bot_score": sm.get("bot_score"),
+            "auth_token": request.cookies.get("defense_auth", ""),
         },
     )
+    if resp.status_code == 428:
+        return JSONResponse(resp.json().get("detail", {}), status_code=428)
     if resp.status_code == 403:
         detail = resp.json().get("detail", {})
         return JSONResponse(
@@ -500,10 +773,14 @@ async def _handle_checkout(
             "buyer_email": buyer.get("email", ""),
             "payment_method": inp.get("paymentMethod", "credit_card"),
             "attendees": inp.get("attendees", []),
+            "auth_token": request.cookies.get("defense_auth", ""),
+            "bot_score": _sensor_meta(session_id).get("bot_score", 60),
         },
     )
     if resp.status_code >= 400:
         detail = resp.json().get("detail", {})
+        if resp.status_code == 428:
+            return JSONResponse(detail, status_code=428)
         return JSONResponse(
             {
                 "errors": [
@@ -525,8 +802,14 @@ async def funnel_queue_status(request: Request):
     session_id = session_id_from_request(request)
     event_id = body.get("eventId") or DEFAULT_EVENT_ID
     join_queue = bool(body.get("joinQueue", False))
+    gate = _gate_status(request, "queue", event_id)
+    if gate:
+        return {"data": {"queueStatus": gate}}
     async with httpx.AsyncClient(timeout=15.0) as client:
-        data = await _handle_queue_status(client, ip, session_id, event_id, join_queue)
+        data = await _handle_queue_status(client, ip, session_id, event_id, join_queue,
+                                          request.cookies.get("defense_auth", ""))
+    if data["status"] == "admitted" and _login_required(get_workflow_config(), "seat") and not current_user(request):
+        data["status"] = "need_login"
     return {"data": {"queueStatus": data}}
 
 
@@ -536,6 +819,14 @@ async def funnel_add_to_cart(request: Request):
     ip = client_ip(request)
     session_id = session_id_from_request(request)
     inp = body.get("input", body)
+    gate = (_gate_response(request, "booking", inp.get("eventId", DEFAULT_EVENT_ID))
+            or _gate_response(request, "seat", inp.get("eventId", DEFAULT_EVENT_ID))
+            or _gate_response(request, "lock", inp.get("eventId", DEFAULT_EVENT_ID)))
+    if gate:
+        return gate
+    token_gate = _bound_token_gate(request, request.headers.get("x-queueit-token", ""))
+    if token_gate:
+        return token_gate
     async with httpx.AsyncClient(timeout=15.0) as client:
         result = await _handle_add_to_cart(client, request, ip, session_id, inp)
     if isinstance(result, JSONResponse):
@@ -549,6 +840,12 @@ async def funnel_checkout(request: Request):
     ip = client_ip(request)
     session_id = session_id_from_request(request)
     inp = body.get("input", body)
+    gate = _gate_response(request, "checkout", cart_event_id(inp.get("cartId", "")))
+    if gate:
+        return gate
+    token_gate = _bound_token_gate(request, inp.get("queueToken") or request.headers.get("x-queueit-token", ""))
+    if token_gate:
+        return token_gate
     async with httpx.AsyncClient(timeout=15.0) as client:
         result = await _handle_checkout(client, request, ip, session_id, inp)
     if isinstance(result, JSONResponse):
@@ -579,11 +876,25 @@ async def graphql_v2(request: Request):
         if op == "queueStatus":
             event_id = variables.get("eventId") or DEFAULT_EVENT_ID
             join = variables.get("joinQueue", False)
-            data = await _handle_queue_status(client, ip, session_id, event_id, join)
+            gate = _gate_status(request, "queue", event_id)
+            if gate:
+                return {"data": {"queueStatus": gate}}
+            data = await _handle_queue_status(client, ip, session_id, event_id, join,
+                                              request.cookies.get("defense_auth", ""))
+            if data["status"] == "admitted" and _login_required(get_workflow_config(), "seat") and not current_user(request):
+                data["status"] = "need_login"
             return {"data": {"queueStatus": data}}
 
         if op == "addToCart":
             inp = variables.get("input", {})
+            gate = (_gate_response(request, "booking", inp.get("eventId", DEFAULT_EVENT_ID))
+                    or _gate_response(request, "seat", inp.get("eventId", DEFAULT_EVENT_ID))
+                    or _gate_response(request, "lock", inp.get("eventId", DEFAULT_EVENT_ID)))
+            if gate:
+                return gate
+            token_gate = _bound_token_gate(request, request.headers.get("x-queueit-token", ""))
+            if token_gate:
+                return token_gate
             result = await _handle_add_to_cart(client, request, ip, session_id, inp)
             if isinstance(result, JSONResponse):
                 return result
@@ -591,6 +902,12 @@ async def graphql_v2(request: Request):
 
         if op == "checkout":
             inp = variables.get("input", {})
+            gate = _gate_response(request, "checkout", cart_event_id(inp.get("cartId", "")))
+            if gate:
+                return gate
+            token_gate = _bound_token_gate(request, inp.get("queueToken") or request.headers.get("x-queueit-token", ""))
+            if token_gate:
+                return token_gate
             result = await _handle_checkout(client, request, ip, session_id, inp)
             if isinstance(result, JSONResponse):
                 return result
@@ -628,7 +945,10 @@ async def qr_verify(request: Request):
 
 
 @app.get("/api/seats/{event_id}")
-async def seats_proxy(event_id: str):
+async def seats_proxy(event_id: str, request: Request):
+    gate = _gate_response(request, "seat", event_id)
+    if gate:
+        return gate
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.get(f"{SEAT_SERVICE_URL}/internal/seats/{event_id}")
         return resp.json()

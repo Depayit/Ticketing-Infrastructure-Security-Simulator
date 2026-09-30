@@ -214,6 +214,14 @@
         }),
       });
 
+      if (res.status === 428) {
+        const gate = await res.json();
+        if (gate.status === "need_login") location.href = "/login?next=/checkout";
+        if (gate.status === "need_captcha") location.href = "/captcha?position=" + encodeURIComponent(gate.position) + "&next=/checkout";
+        if (gate.status === "need_sensor") location.href = "/";
+        return;
+      }
+
       if (res.status === 403) {
         const body = await res.json().catch(() => ({}));
         showMsg(

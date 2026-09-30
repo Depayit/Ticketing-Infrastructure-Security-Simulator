@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Defense Lab — CAPTCHA</title><link rel="stylesheet" href="/static/ticket.css">
+<style>main{max-width:420px;margin:8vh auto;padding:28px;background:white;border-radius:12px;box-shadow:0 8px 30px #0002}input{display:block;width:100%;padding:10px;margin:16px 0}#error{color:#b91c1c}</style></head>
+<body><main><h1>CAPTCHA จำลอง</h1><p>ด่านนี้แยกจาก Sensor Challenge</p><p id="question">กำลังโหลด...</p>
+<form id="form"><input id="answer" inputmode="numeric" required aria-label="คำตอบ"><button class="ticket-btn" type="submit">ยืนยัน</button></form>
+<p id="error" role="alert"></p></main><script>
+const params = new URLSearchParams(location.search);
+const position = params.get("position") || "queue";
+const nextPath = params.get("next");
+const next = ["/", "/member-code", "/seats", "/checkout"].includes(nextPath) ? nextPath : "/";
+let eventId = "demo-concert-2026";
+async function loadChallenge() {
+  const configResponse = await fetch("/api/event-config");
+  if (configResponse.ok) eventId = (await configResponse.json()).eventId || eventId;
+  const response = await fetch(`/api/captcha/challenge?position=${encodeURIComponent(position)}&event_id=${encodeURIComponent(eventId)}`, {credentials:"include"});
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.detail || "CAPTCHA_UNAVAILABLE");
+  if (!data.required) { location.href = next; return; }
+  document.getElementById("question").textContent = data.question;
+}
+loadChallenge().catch(err => document.getElementById("error").textContent = String(err.message || err));
+document.getElementById("form").addEventListener("submit", async event => {
+  event.preventDefault();
+  const response = await fetch("/api/captcha/verify", {method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({position,event_id:eventId,answer:document.getElementById("answer").value})});
+  if (response.ok) { location.href = next; return; }
+  const data = await response.json();
+  document.getElementById("error").textContent = data.detail || "CAPTCHA_FAILED";
+});
+</script></body></html>

@@ -1,6 +1,10 @@
 # Ticket Defense Demo — Swiss Cheese + Akamai Simulation
 
-Mock ticketing platform demonstrating **Edge/CDN**, **Queue-it priority queue**, **Akamai Bot Manager** (sensor + cookies + bot score), **AI fraud**, and **3DS** against `Ticket-bot-2026`.
+Isolated ticketing Defense Lab demonstrating **Edge/WAF**, a **Waiting Room**, **Akamai-style Bot Manager simulation** (sensor + cookies + Bot Score), **fraud scoring**, and **mock 3DS**. It does not connect to a real ticketing platform.
+
+See [WORKFLOW.md](WORKFLOW.md), [ARCHITECTURE.md](ARCHITECTURE.md), and [GLOSSARY.md](GLOSSARY.md) for the route, service map, and terminology.
+
+The admin Event Config dialog switches Workflow Profiles A–D at runtime. Profiles A/B/D enforce mock Login Gates and C/D enable server checked form CAPTCHA. Login accepts any nonempty password for a valid email and creates a separate Auth Session; it is a lab identity only.
 
 ## Quick Start (Docker)
 
@@ -16,8 +20,10 @@ docker compose -f docker-compose.defense.yml up --build
 | http://localhost:8090/seats | เลือกที่นั่ง | AI (Telemetry → Fraud Engine) |
 | http://localhost:8090/checkout | ชำระเงิน + 3DS | Payment/3DS |
 | http://localhost:8090/admin | Live Audit Dashboard | ทุก layer |
+| http://localhost:8090/login | Mock Login Gate | Auth Session |
+| http://localhost:8090/captcha | Form CAPTCHA | Server checked challenge |
 
-**Event:** 2026-27 JACOB WORLD TOUR IN BANGKOK (`demo-concert-2026`)
+**Event:** BTS WORLD TOUR 'ARIRANG' IN BANGKOK (`demo-concert-2026`)
 
 ## Defense Stack (สเปกจำลอง Ticket)
 
@@ -26,10 +32,11 @@ docker compose -f docker-compose.defense.yml up --build
 - **Global Anti-DDoS**: cluster-wide RPS cap (`EDGE_DDOS_GLOBAL_RPS`, default 800)
 - **WAF**: datacenter IP block, burst, per-route rate limits
 
-### Traffic Control — Queue-it
-- Virtual Waiting Room UI + GraphQL `queueStatus`
-- **Randomized queue position** (display inflated by bot score)
-- **Priority admission**: Redis ZSET sorted by bot score (ต่ำ = ผ่านก่อน)
+### Traffic Control — Waiting Room
+- Virtual Waiting Room UI + funnel `queue-status` (`/graphql/v2` is disabled by default)
+- Redis sorted waiting list with atomic FIFO or Bot Score priority admission, capped by `ADMISSION_RATE` per second
+- `off` mode admits without rate limiting; queue tokens remain bound to IP and Sensor Session
+- A configurable soft-open period admits at 25% of the normal rate after sale start
 
 ### Akamai Bot Manager (จำลอง)
 | รายการ | รายละเอียด |
@@ -38,7 +45,7 @@ docker compose -f docker-compose.defense.yml up --build
 | Cookies | `_abck`, `ak_bmsc` (HttpOnly), `bm_sv` (request count) |
 | Sensor | `akamai-sensor.js` → >100 signals → PRNG shuffle + substitution → `POST /api/sensor` |
 | Challenge | score ≥ 55 → `_abck` status `-1` → modal → `POST /api/challenge/pass` |
-| Queue tie-in | score ต่ำ = priority สูง, score สูง = คิวช้า + challenge |
+| Queue tie-in | `priority_score` จัดลำดับคะแนนต่ำก่อน; sensor challenge เป็นอีกขั้นหนึ่ง |
 
 ### AI + 3DS (เดิม)
 - Telemetry mouse/scroll → Fraud Engine (รวม bot_score จาก Akamai)
@@ -48,7 +55,7 @@ docker compose -f docker-compose.defense.yml up --build
 
 1. โหลดหน้า Waiting Room → **Akamai Sensor** inject + ส่ง `sensor_data`
 2. Server ถอดรหัส → ตั้ง cookies → แสดง Bot Score
-3. Join Queue → เข้า ZSET ตาม priority
+3. Join Waiting Room → FIFO หรือ score priority admission
 4. ถ้า challenge → กด Complete Challenge → ลด score → เข้าคิวต่อ
 5. Admitted → token → Seat map → Checkout
 
@@ -71,7 +78,7 @@ Headers: x-session-id: <uuid>
 }
 ```
 
-บอทที่ไม่ส่ง sensor / ไม่มี telemetry → Bot Score สูง → คิวช้า / challenge / AI block
+คำขอที่ไม่มี sensor / telemetry อาจเจอ sensor gate หรือ fraud block; `priority_score` จัดลำดับตาม Bot Score
 
 ## Bot bypass lockdown (ปิด GraphQL)
 
@@ -96,3 +103,15 @@ Headers: x-session-id: <uuid>
 `AI_LAYER_ENABLED=false` on fraud-engine service.
 
 See [CASE_STUDY.md](CASE_STUDY.md) for scenarios.
+
+## Test and observe
+
+```bash
+docker compose -f docker-compose.defense.yml --profile test run --rm --build lab-tests
+docker compose -f docker-compose.defense.yml up -d --build gateway
+docker compose -f docker-compose.defense.yml --profile test run --rm --build lab-smoke
+docker compose -f docker-compose.defense.yml --profile loadgen run --rm --build bot-loadgen
+docker compose -f docker-compose.defense.yml --profile observability up -d
+```
+
+The load generator only accepts the local lab gateway and defaults to one actor per scenario. Set `SCENARIO_PACK=medium|large` or `LOADGEN_COUNT` for a bounded larger run. JSON results go to `reports/`. Prometheus is at `http://localhost:9090`, Grafana at `http://localhost:3000`, and raw metrics at `/metrics`. See [SCENARIOS.md](SCENARIOS.md) and [AFTER_ACTION_REPORT.md](AFTER_ACTION_REPORT.md).

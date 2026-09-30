@@ -27,6 +27,7 @@ def log_event(
     }
     r.lpush(AUDIT_KEY, json.dumps(entry))
     r.ltrim(AUDIT_KEY, 0, AUDIT_MAX - 1)
+    r.hincrby("defense:metrics:events", f"{layer}|{action}|{int(blocked)}", 1)
 
 
 def get_audit_events(limit: int = 100) -> List[Dict[str, Any]]:
@@ -49,12 +50,23 @@ def reset_seats_and_sessions() -> Dict[str, Any]:
         "defense:seat:*",
         "defense:cart:*",
         "defense:sensor:*",
+        "defense:auth:*",
+        "defense:captcha:*",
         "defense:telemetry:*",
         "defense:bm_sv:*",
         "defense:token:*",
         "defense:challenge_ok:*",
         "defense:ban:*",
         "defense:queue:*",
+        "defense:waiting:*",
+        "defense:admission:*",
+        "defense:abuse:*",
+        "defense:ban:hold:*",
+        "defense:3ds:*",
+        "defense:qr:*",
+        "defense:orders",
+        "defense:metric:*",
+        "defense:metrics:*",
     ]
     deleted = 0
     for pattern in patterns:
@@ -71,7 +83,7 @@ def _reinit_all_seats() -> None:
     """Force all seats back to 'available' in Redis."""
     import json as _json
     default_event_id = "demo-concert-2026"
-    default_seats = ["VIP-A1", "VIP-A2", "GA-B1", "GA-B2", "STAND-C1", "STAND-C2"]
+    default_seats = ["VIP", "RED", "RED_RESTRICTED", "BLUE", "YELLOW", "GREEN", "TEAL"]
     for seat in default_seats:
         key = f"defense:seat:{default_event_id}:{seat}"
         r.set(key, _json.dumps({"status": "available", "session_id": "", "cart_id": ""}))

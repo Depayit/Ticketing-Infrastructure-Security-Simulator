@@ -1,13 +1,11 @@
 services:
   defense-redis:
     image: redis:7-alpine
-    container_name: defense-redis
     ports:
       - "127.0.0.1:6380:6379"
 
   fraud-engine:
     build: .
-    container_name: defense-fraud
     working_dir: /app/fraud-engine
     command: uvicorn main:app --host 0.0.0.0 --port 8094
     environment:
@@ -17,7 +15,6 @@ services:
 
   queue-service:
     build: .
-    container_name: defense-queue
     working_dir: /app/queue-service
     command: uvicorn main:app --host 0.0.0.0 --port 8091
     environment:
@@ -29,7 +26,6 @@ services:
 
   seat-service:
     build: .
-    container_name: defense-seat
     working_dir: /app/seat-service
     command: uvicorn main:app --host 0.0.0.0 --port 8092
     environment:
@@ -43,7 +39,6 @@ services:
 
   payment-service:
     build: .
-    container_name: defense-payment
     working_dir: /app/payment-service
     command: uvicorn main:app --host 0.0.0.0 --port 8093
     environment:
@@ -58,7 +53,6 @@ services:
 
   gateway:
     build: .
-    container_name: defense-gateway
     working_dir: /app/gateway
     command: uvicorn main:app --host 0.0.0.0 --port 8090
     environment:
@@ -75,7 +69,62 @@ services:
     ports:
       - "127.0.0.1:8090:8090"
 
-networks:
-  default:
-    name: ticketing-lab
-    external: true
+  prometheus:
+    image: prom/prometheus:v3.14.0
+    profiles: ["observability"]
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "127.0.0.1:9090:9090"
+    depends_on:
+      - gateway
+  grafana:
+    image: grafana/grafana:13.1.5
+    profiles: ["observability"]
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - prometheus
+
+  bot-loadgen:
+    profiles: ["loadgen"]
+    build:
+      context: .
+      dockerfile: bot-loadgen/Dockerfile
+    environment:
+      - DEFENSE_BASE_URL=http://gateway:8090
+      - SCENARIO_PACK=${SCENARIO_PACK:-small}
+      - LOADGEN_COUNT=${LOADGEN_COUNT:-0}
+      - LOADGEN_SCENARIOS=${LOADGEN_SCENARIOS:-simple_http,no_sensor,browser_like,stealth_browser,full_behavioral,multi_account,human_browser}
+      - REPORT_DIR=/reports
+    volumes:
+      - ./reports:/reports
+    depends_on:
+      - gateway
+
+  lab-tests:
+    profiles: ["test"]
+    build: .
+    working_dir: /app
+    command: python -m unittest discover -s tests -v
+    environment:
+      - REDIS_URL=redis://defense-redis:6379/15
+      - TEST_REDIS_URL=redis://defense-redis:6379/15
+    depends_on:
+      - defense-redis
+
+  lab-smoke:
+    profiles: ["test"]
+    build: .
+    working_dir: /app
+    command: python tests/smoke_profiles.py
+    environment:
+      - GATEWAY_URL=http://gateway:8090
+    depends_on:
+      - gateway

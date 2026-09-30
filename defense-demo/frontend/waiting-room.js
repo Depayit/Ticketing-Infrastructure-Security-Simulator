@@ -43,6 +43,7 @@
   let botScore = null;
   let queueJoined = false;
   let pollCount = 0;
+  let workflow = { WORKFLOW_PROFILE: "custom", CAPTCHA_POSITION: "none" };
 
   const els = {
     demoBadge: document.getElementById("demo-badge"),
@@ -223,7 +224,12 @@
     const t = Date.now();
     if (state.admitted) return "admitted";
     if (state.inQueue) return "queue";
+    if (state.loggedIn && t >= saleStartMs) return "entry";
     if (state.joinedQueue === false && t >= saleStartMs) return "entry";
+    if (workflow.WORKFLOW_PROFILE !== "custom" && !workflow.REQUIRE_LOGIN_BEFORE_QUEUE) {
+      if (t >= saleStartMs) return "entry";
+      if (t >= preLoginStartMs) return "countdown";
+    }
     if (state.loggedIn && t < saleStartMs) return "countdown";
     if (t >= preLoginStartMs) return "login";
     return "too_early";
@@ -314,7 +320,7 @@
     lastQueuePosition = pos;
     const scoreTxt = score != null ? " · Bot Score " + score : "";
     els.queuePosition.textContent =
-      "Queue position ~" + pos + " (Queue-it randomized · priority by score)" + scoreTxt;
+      "Waiting Room position ~" + pos + scoreTxt;
   }
 
   function showAkamaiChallenge() {
@@ -372,11 +378,39 @@
     try {
       const data = await funnelRequest("/api/funnel/queue-status", {
         eventId: CONFIG.eventId,
-        joinQueue: !queueJoined,
+        joinQueue: true,
       });
       if (!queueJoined) queueJoined = true;
       hideDefenseError();
       const qs = data.data?.queueStatus;
+
+      if (qs?.status === "need_sensor") {
+        await initAkamaiSensor();
+        pollTimer = setTimeout(pollQueueStatus, CONFIG.pollIntervalMs);
+        return;
+      }
+
+      if (qs?.status === "need_login") {
+        clearTimers();
+        if (qs.token) {
+          showAdmitted(qs.token, qs.issuedAt);
+          location.href = "/login?next=/member-code";
+        } else {
+          location.href = "/login?next=/";
+        }
+        return;
+      }
+      if (qs?.status === "need_captcha") {
+        clearTimers();
+        location.href = "/captcha?position=" + encodeURIComponent(qs.position || "queue") + "&next=/";
+        return;
+      }
+      if (qs?.status === "denied") {
+        clearTimers();
+        showDefenseError("Waiting Room: " + (qs.reason || "DENIED"));
+        if (qs.reason === "BOT_SCORE_TOO_HIGH") showAkamaiChallenge();
+        return;
+      }
 
       if (qs?.botScore != null) {
         botScore = qs.botScore;
@@ -408,7 +442,11 @@
       if (qs?.status === "admitted" && qs.token) {
         clearTimers();
         updateProgress(100);
-        setTimeout(() => triggerFinalCaptcha(qs.token, qs.issuedAt), 500);
+        if (workflow.WORKFLOW_PROFILE === "custom" && workflow.CAPTCHA_POSITION === "none") {
+          setTimeout(() => triggerFinalCaptcha(qs.token, qs.issuedAt), 500);
+        } else {
+          showAdmitted(qs.token, qs.issuedAt);
+        }
         return;
       }
     } catch (err) {
@@ -460,11 +498,37 @@
 
   async function boot() {
     try {
+      const configResponse = await fetch("/api/event-config");
+      if (configResponse.ok) {
+        const eventConfig = await configResponse.json();
+        workflow = eventConfig.workflow || workflow;
+        CONFIG.eventId = eventConfig.eventId || CONFIG.eventId;
+        CONFIG.eventName = eventConfig.eventName || CONFIG.eventName;
+      }
+    } catch (error) { console.warn("workflow config unavailable", error); }
+    if (workflow.REQUIRE_LOGIN_BEFORE_QUEUE) {
+      try {
+        const authResponse = await fetch("/api/auth/session", { credentials: "include" });
+        if (authResponse.ok && (await authResponse.json()).authenticated) saveState({ loggedIn: true });
+      } catch (error) { console.warn("auth status unavailable", error); }
+    }
+    try {
       const data = await funnelRequest("/api/funnel/queue-status", {
         eventId: CONFIG.eventId,
         joinQueue: false,
       });
       const qs = data?.data?.queueStatus;
+      if (qs?.status === "need_sensor") {
+        await initAkamaiSensor();
+      }
+      if (qs?.status === "need_login" && !qs.token) {
+        location.href = "/login?next=/";
+        return;
+      }
+      if (qs?.status === "need_captcha") {
+        location.href = "/captcha?position=" + encodeURIComponent(qs.position || "queue") + "&next=/";
+        return;
+      }
       if (qs?.status === "pre_queue" && qs?.startTime) {
         saleStartMs = qs.startTime * 1000;
         localStorage.setItem("ticket_sale_start_ms", String(saleStartMs));
@@ -510,7 +574,7 @@
     }
   }
 
-  els.loginForm?.addEventListener("submit", (e) => {
+  els.loginForm?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const email = document.getElementById("login-email")?.value?.trim();
     const password = document.getElementById("login-password")?.value;
@@ -521,6 +585,15 @@
       return;
     }
     
+    if (workflow.REQUIRE_LOGIN_BEFORE_QUEUE) {
+      try {
+        const response = await fetch("/api/auth/login", {
+          method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+        if (!response.ok) throw new Error((await response.json()).detail || "LOGIN_FAILED");
+      } catch (error) { showDefenseError("Login Gate: " + error.message); return; }
+    }
     saveState({ loggedIn: true, email });
     DefenseTelemetry.track("funnel", { step: "login", email });
     if (Date.now() >= saleStartMs) showEntryZone();

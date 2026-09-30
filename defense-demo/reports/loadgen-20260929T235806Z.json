@@ -1,0 +1,159 @@
+{
+  "generated_at": "2026-09-29T23:58:06.025245+00:00",
+  "pack": "small",
+  "count_per_scenario": 1,
+  "results": [
+    {
+      "scenario": "simple_http",
+      "index": 0,
+      "status": "need_sensor",
+      "admit_ms": null,
+      "locked": false,
+      "paid": false,
+      "captcha_required": 0,
+      "captcha_passed": 0
+    },
+    {
+      "scenario": "no_sensor",
+      "index": 0,
+      "status": "need_sensor",
+      "admit_ms": null,
+      "locked": false,
+      "paid": false,
+      "captcha_required": 0,
+      "captcha_passed": 0
+    },
+    {
+      "scenario": "browser_like",
+      "index": 0,
+      "status": "admitted",
+      "admit_ms": 2709,
+      "locked": false,
+      "paid": false,
+      "captcha_required": 1,
+      "captcha_passed": 1
+    },
+    {
+      "scenario": "stealth_browser",
+      "index": 0,
+      "status": "locked",
+      "admit_ms": 2427,
+      "locked": true,
+      "paid": false,
+      "captcha_required": 1,
+      "captcha_passed": 1
+    },
+    {
+      "scenario": "full_behavioral",
+      "index": 0,
+      "status": "paid",
+      "admit_ms": 1556,
+      "locked": true,
+      "paid": true,
+      "captcha_required": 1,
+      "captcha_passed": 1
+    },
+    {
+      "scenario": "multi_account",
+      "index": 0,
+      "status": "locked",
+      "admit_ms": 2711,
+      "locked": true,
+      "paid": false,
+      "captcha_required": 2,
+      "captcha_passed": 2
+    },
+    {
+      "scenario": "human_browser",
+      "index": 0,
+      "status": "paid",
+      "admit_ms": 3238,
+      "locked": true,
+      "paid": true,
+      "captcha_required": 3,
+      "captcha_passed": 3
+    }
+  ],
+  "by_scenario": {
+    "simple_http": {
+      "attempted": 1,
+      "completed": 1,
+      "blocked": 1,
+      "admitted": 0,
+      "locked": 0,
+      "paid": 0,
+      "captcha_presented": 0,
+      "captcha_passed": 0
+    },
+    "no_sensor": {
+      "attempted": 1,
+      "completed": 1,
+      "blocked": 1,
+      "admitted": 0,
+      "locked": 0,
+      "paid": 0,
+      "captcha_presented": 0,
+      "captcha_passed": 0
+    },
+    "browser_like": {
+      "attempted": 1,
+      "completed": 1,
+      "blocked": 0,
+      "admitted": 1,
+      "locked": 0,
+      "paid": 0,
+      "captcha_presented": 1,
+      "captcha_passed": 1
+    },
+    "stealth_browser": {
+      "attempted": 1,
+      "completed": 1,
+      "blocked": 0,
+      "admitted": 1,
+      "locked": 1,
+      "paid": 0,
+      "captcha_presented": 1,
+      "captcha_passed": 1
+    },
+    "full_behavioral": {
+      "attempted": 1,
+      "completed": 1,
+      "blocked": 0,
+      "admitted": 1,
+      "locked": 1,
+      "paid": 1,
+      "captcha_presented": 1,
+      "captcha_passed": 1
+    },
+    "multi_account": {
+      "attempted": 1,
+      "completed": 1,
+      "blocked": 0,
+      "admitted": 1,
+      "locked": 1,
+      "paid": 0,
+      "captcha_presented": 2,
+      "captcha_passed": 2
+    },
+    "human_browser": {
+      "attempted": 1,
+      "completed": 1,
+      "blocked": 0,
+      "admitted": 1,
+      "locked": 1,
+      "paid": 1,
+      "captcha_presented": 3,
+      "captcha_passed": 3
+    }
+  },
+  "bot_block_rate": 0.3333333333333333,
+  "synthetic_human_false_positive_rate": 0.0,
+  "bot_seat_lock_rate": 0.5,
+  "bot_payment_success_rate": 0.16666666666666666,
+  "harness_errors": 0,
+  "median_time_to_admit_ms": 2709,
+  "bot_median_time_to_admit_ms": 2568.0,
+  "human_median_time_to_admit_ms": 3238,
+  "unpaid_hold_rate": 0.5,
+  "captcha_pass_rate": 1.0
+}

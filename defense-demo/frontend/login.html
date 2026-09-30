@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Defense Lab — Login Gate</title><link rel="stylesheet" href="/static/ticket.css">
+<script src="/static/akamai-sensor.js"></script>
+<style>main{max-width:420px;margin:8vh auto;padding:28px;background:white;border-radius:12px;box-shadow:0 8px 30px #0002}label{display:block;margin:16px 0}input{display:block;width:100%;padding:10px;margin-top:5px}#error{color:#b91c1c}</style></head>
+<body><main><h1>Login Gate</h1><p>บัญชีจำลองสำหรับ Defense Lab</p>
+<form id="form"><label>อีเมล<input id="email" type="email" required autocomplete="username"></label>
+<label>รหัสผ่าน<input id="password" type="password" required autocomplete="current-password"></label>
+<button class="ticket-btn" type="submit">เข้าสู่ระบบ</button></form><p id="error" role="alert"></p></main>
+<script>
+const nextPath = new URLSearchParams(location.search).get("next");
+const next = ["/", "/member-code", "/seats", "/checkout"].includes(nextPath) ? nextPath : "/";
+document.getElementById("form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const error = document.getElementById("error"); error.textContent = "";
+  try {
+    await AkamaiSensor.submitSensor();
+    const response = await fetch("/api/auth/login", {method:"POST",credentials:"include",headers:{"Content-Type":"application/json"},body:JSON.stringify({
+      email:document.getElementById("email").value,password:document.getElementById("password").value,
+      queue_token:next === "/" ? "" : (localStorage.getItem("defense_queue_token") || "")
+    })});
+    if (!response.ok) { const data = await response.json(); throw new Error(data.detail || "LOGIN_FAILED"); }
+    location.href = next;
+  } catch (err) { error.textContent = String(err.message || err); }
+});
+</script></body></html>

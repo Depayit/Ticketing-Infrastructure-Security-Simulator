@@ -112,6 +112,7 @@
     .btn-page:hover { background: #f3f4f6; }
     .btn-page.active { background: var(--Ticket-blue); color: #fff; border-color: var(--Ticket-blue); }
     .toggle-wrapper { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: #f9fafb; border-radius: 8px; border: 1px solid #e5e7eb; }
+    #cfg-workflow-custom[hidden] { display: none !important; }
     .toggle-wrapper span { font-size: 13px; font-weight: 600; color: #374151; }
     .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
     .switch input { opacity: 0; width: 0; height: 0; }
@@ -173,6 +174,7 @@
         <button type="button" class="btn-reset-seats" id="btn-reset-seats">🔄 รีเซ็ตที่นั่ง & Sessions</button>
         <button type="button" class="btn-clear" id="btn-clear-all">🗑️ ล้างข้อมูลทั้งหมด</button>
         <button type="button" class="btn-config" id="btn-set-prequeue" style="background:#8b5cf6;">⏳ ตั้งเวลา Pre-Queue (1 นาที)</button>
+        <button type="button" class="btn-config" id="btn-soft-open" style="background:#0f766e;">เริ่ม Soft-open 30 วินาที</button>
       </div>
     </div>
 
@@ -189,6 +191,12 @@
       <button type="button" class="tab-pass" data-filter="pass">ผ่าน</button>
       <button type="button" class="tab-fail" data-filter="fail">ไม่ผ่าน</button>
       <button type="button" data-filter="layer-edge">EDGE</button>
+      <button type="button" data-filter="layer-bot">BOT</button>
+      <button type="button" data-filter="layer-queue">QUEUE</button>
+      <button type="button" data-filter="layer-login">LOGIN</button>
+      <button type="button" data-filter="layer-captcha">CAPTCHA</button>
+      <button type="button" data-filter="layer-seat">SEAT</button>
+      <button type="button" data-filter="layer-pay">PAY</button>
     </div>
 
     <!-- Event Config Modal -->
@@ -207,6 +215,19 @@
           <label style="display:block; font-weight:bold; margin-bottom:4px;">ข้อมูลโซนและราคา (JSON)</label>
           <textarea id="cfg-zones-json" style="width:100%; height:180px; padding:8px; border:1px solid #ccc; border-radius:4px; font-family:monospace;"></textarea>
         </div>
+        <fieldset style="margin-bottom:16px; border:1px solid #ddd; border-radius:8px;">
+          <legend>Workflow Profile</legend>
+          <p style="font-size:12px; color:#666;">Login Gate และ CAPTCHA ใช้งานตามตำแหน่งที่เลือกแล้ว; priority_score ยังรอ Phase 4</p>
+          <label>Profile <select id="cfg-workflow-profile"><option value="custom">custom (ค่าเดิม)</option><option value="A">A — Queue → Login → Seat</option><option value="B">B — Login → Queue → Seat</option><option value="C">C — Random CAPTCHA</option><option value="D">D — Full lockdown</option></select></label>
+          <div id="cfg-workflow-custom" style="display:grid; gap:8px; margin-top:12px;">
+            <label><input type="checkbox" id="cfg-login-queue"> Login ก่อน Waiting Room</label>
+            <label><input type="checkbox" id="cfg-login-seat"> Login ก่อน Seat Map</label>
+            <label><input type="checkbox" id="cfg-login-lock"> Login ก่อน Seat Lock</label>
+            <label>CAPTCHA Position <select id="cfg-captcha-position"><option>none</option><option>queue</option><option>booking</option><option>seat</option><option>lock</option><option>checkout</option><option>random</option></select></label>
+            <label>CAPTCHA Random Rate (0–1) <input type="number" id="cfg-captcha-rate" min="0" max="1" step="0.01"></label>
+            <label>Queue Mode <select id="cfg-queue-mode"><option>fifo_rate</option><option>off</option><option>priority_score</option></select></label>
+          </div>
+        </fieldset>
         <div style="display:flex; justify-content:flex-end; gap:12px;">
           <button type="button" id="btn-close-config" style="padding:8px 16px; border:none; background:#ccc; border-radius:6px; cursor:pointer;">ยกเลิก</button>
           <button type="button" id="btn-save-config" style="padding:8px 16px; border:none; background:var(--Ticket-blue); color:#fff; border-radius:6px; cursor:pointer; font-weight:bold;">บันทึก</button>
@@ -256,6 +277,12 @@
     function filterEvents(events) {
       if (currentFilter === "pass") return events.filter((e) => !e.blocked);
       if (currentFilter === "fail") return events.filter((e) => e.blocked);
+      const layers = {
+        "layer-edge": ["edge", "ip"], "layer-bot": ["akamai", "ai"],
+        "layer-queue": ["queue"], "layer-login": ["login"], "layer-captcha": ["captcha"],
+        "layer-seat": ["seat"], "layer-pay": ["payment", "3ds"]
+      };
+      if (layers[currentFilter]) return events.filter((e) => layers[currentFilter].includes(e.layer));
       return events;
     }
 
@@ -351,6 +378,15 @@
           document.getElementById("cfg-event-name").value = currentEventConfig.eventName || "";
           document.getElementById("cfg-max-tickets").value = currentEventConfig.maxTicketsPerAccount || 4;
           document.getElementById("cfg-zones-json").value = JSON.stringify(currentEventConfig.zones || [], null, 2);
+          const workflow = currentEventConfig.workflow || {};
+          document.getElementById("cfg-workflow-profile").value = workflow.WORKFLOW_PROFILE || "custom";
+          document.getElementById("cfg-login-queue").checked = !!workflow.REQUIRE_LOGIN_BEFORE_QUEUE;
+          document.getElementById("cfg-login-seat").checked = !!workflow.REQUIRE_LOGIN_BEFORE_SEAT;
+          document.getElementById("cfg-login-lock").checked = !!workflow.REQUIRE_LOGIN_BEFORE_LOCK;
+          document.getElementById("cfg-captcha-position").value = workflow.CAPTCHA_POSITION || "none";
+          document.getElementById("cfg-captcha-rate").value = workflow.CAPTCHA_RANDOM_RATE ?? 0;
+          document.getElementById("cfg-queue-mode").value = workflow.QUEUE_MODE || "fifo_rate";
+          document.getElementById("cfg-workflow-custom").hidden = workflow.WORKFLOW_PROFILE !== "custom";
           configModal.style.display = "flex";
         } else {
           showToast("ไม่สามารถโหลด Config ได้", "error");
@@ -363,18 +399,32 @@
     document.getElementById("btn-close-config").addEventListener("click", () => {
       configModal.style.display = "none";
     });
+    document.getElementById("cfg-workflow-profile").addEventListener("change", (event) => {
+      document.getElementById("cfg-workflow-custom").hidden = event.target.value !== "custom";
+    });
 
     document.getElementById("btn-save-config").addEventListener("click", async () => {
       try {
         const eventName = document.getElementById("cfg-event-name").value;
         const maxTickets = parseInt(document.getElementById("cfg-max-tickets").value, 10);
         const zones = JSON.parse(document.getElementById("cfg-zones-json").value);
+        const profile = document.getElementById("cfg-workflow-profile").value;
+        const workflow = profile === "custom" ? {
+          WORKFLOW_PROFILE: profile,
+          REQUIRE_LOGIN_BEFORE_QUEUE: document.getElementById("cfg-login-queue").checked,
+          REQUIRE_LOGIN_BEFORE_SEAT: document.getElementById("cfg-login-seat").checked,
+          REQUIRE_LOGIN_BEFORE_LOCK: document.getElementById("cfg-login-lock").checked,
+          CAPTCHA_POSITION: document.getElementById("cfg-captcha-position").value,
+          CAPTCHA_RANDOM_RATE: Number(document.getElementById("cfg-captcha-rate").value),
+          QUEUE_MODE: document.getElementById("cfg-queue-mode").value
+        } : { WORKFLOW_PROFILE: profile };
         
         const payload = {
           ...currentEventConfig,
           eventName,
           maxTicketsPerAccount: maxTickets,
-          zones
+          zones,
+          workflow
         };
 
         const res = await fetch("/api/event-config", {
@@ -387,7 +437,8 @@
           showToast("บันทึกการตั้งค่าแล้ว", "success");
           configModal.style.display = "none";
         } else {
-          showToast("บันทึกไม่สำเร็จ", "error");
+          const error = await res.json();
+          showToast("บันทึกไม่สำเร็จ: " + (error.detail || res.status), "error");
         }
       } catch (e) {
         showToast("รูปแบบ JSON ไม่ถูกต้อง หรือมีข้อผิดพลาด", "error");
@@ -506,6 +557,12 @@
       } catch (e) {
         showToast("ตั้งเวลาไม่สำเร็จ: " + e.message);
       }
+    });
+
+    document.getElementById("btn-soft-open").addEventListener("click", async () => {
+      const res = await fetch("/admin/api/set-sale-start", {method:"POST", headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({delay_seconds:0, soft_open_seconds:30})});
+      showToast(res.ok ? "เริ่ม Soft-open แล้ว (25% admit rate)" : "เริ่ม Soft-open ไม่สำเร็จ");
     });
 
     loadToggles();

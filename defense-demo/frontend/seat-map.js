@@ -187,6 +187,14 @@
       }),
     });
 
+    if (res.status === 428) {
+      const gate = await res.json();
+      if (gate.status === "need_login") location.href = "/login?next=/seats";
+      if (gate.status === "need_captcha") location.href = "/captcha?position=" + encodeURIComponent(gate.position) + "&next=/seats";
+      if (gate.status === "need_sensor") location.href = "/";
+      return;
+    }
+
     if (res.status === 403) {
       const body = await res.json().catch(() => ({}));
       const err = body.errors?.[0] || body;

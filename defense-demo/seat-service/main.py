@@ -13,6 +13,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from shared.config import DEFAULT_EVENT_ID, FRAUD_ENGINE_URL, SEAT_LOCK_TTL_SEC
 from shared.events import log_event
 from shared.redis_client import r
+from shared.workflow import auth_user, captcha_passed, captcha_required, get_workflow, sensor_score
+from shared.seat_state import lock_hold, read_seat, release_hold
 
 app = FastAPI(title="Seat Service")
 
@@ -33,36 +35,29 @@ async def simulate_concurrent_booking():
         event_id = DEFAULT_EVENT_ID
         init_seats(event_id)
         
-        # Find available seats
-        available_seats = []
-        locked_seats = []
-        for seat in DEFAULT_SEATS:
-            key = seat_state_key(event_id, seat)
-            raw = r.get(key)
-            if raw:
-                state = json.loads(raw)
-                if state.get("status") == "available":
-                    available_seats.append(seat)
-                elif state.get("status") == "locked":
-                    locked_seats.append(seat)
-                    
-        # Randomly release a locked seat to simulate payment failure/timeout (20% chance)
-        if locked_seats and random.random() < 0.2:
-            seat_to_release = random.choice(locked_seats)
-            key = seat_state_key(event_id, seat_to_release)
-            r.set(key, json.dumps({"status": "available", "session_id": "", "cart_id": ""}))
-            continue
-            
-        # Randomly lock an available seat
+        available_seats = [seat for seat in DEFAULT_SEATS if get_seat(event_id, seat)["status"] == "available"]
         if available_seats:
             seat_to_lock = random.choice(available_seats)
-            key = seat_state_key(event_id, seat_to_lock)
-            r.set(key, json.dumps({"status": "locked", "session_id": "sim_bot", "cart_id": "sim_cart"}))
-            log_event("seat", "seat_locked_by_sim", "sim_bot", "127.0.0.1", {"seat_id": seat_to_lock})
+            cart_id = f"sim-{uuid.uuid4().hex}"
+            cart = {"event_id": event_id, "seat_id": seat_to_lock, "session_id": "sim_bot"}
+            if lock_hold(event_id, seat_to_lock, cart_id, "sim_bot", "127.0.0.1", cart, 20) == "locked":
+                log_event("seat", "seat_locked_by_sim", "sim_bot", "127.0.0.1", {"seat_id": seat_to_lock})
+                await asyncio.sleep(random.uniform(3.0, 8.0))
+                release_hold(event_id, seat_to_lock, cart_id)
+
+
+async def sweep_expired_holds():
+    while True:
+        await asyncio.sleep(5)
+        raw = r.get("defense:config:event")
+        event_id = json.loads(raw).get("eventId", DEFAULT_EVENT_ID) if raw else DEFAULT_EVENT_ID
+        for seat in DEFAULT_SEATS:
+            get_seat(event_id, seat)
 
 @app.on_event("startup")
 async def startup_event():
     asyncio.create_task(simulate_concurrent_booking())
+    asyncio.create_task(sweep_expired_holds())
 
 
 def seat_state_key(event_id: str, seat_id: str) -> str:
@@ -78,8 +73,7 @@ def init_seats(event_id: str) -> None:
 
 def get_seat(event_id: str, seat_id: str) -> Dict[str, Any]:
     init_seats(event_id)
-    raw = r.get(seat_state_key(event_id, seat_id))
-    return json.loads(raw) if raw else {"status": "available", "session_id": "", "cart_id": ""}
+    return read_seat(event_id, seat_id)
 
 
 class TelemetryEvent(BaseModel):
@@ -106,6 +100,8 @@ class AddToCartRequest(BaseModel):
     ip: str = ""
     session_id: str = ""
     api_only: bool = False
+    auth_token: str = ""
+    bot_score: int = 60
 
 
 @app.get("/health")
@@ -132,6 +128,26 @@ def ingest_telemetry(batch: TelemetryBatch):
 
 @app.post("/internal/add-to-cart")
 async def add_to_cart(req: AddToCartRequest):
+    workflow = get_workflow()
+    if (any(workflow[key] for key in ("REQUIRE_LOGIN_BEFORE_QUEUE", "REQUIRE_LOGIN_BEFORE_SEAT", "REQUIRE_LOGIN_BEFORE_LOCK"))
+            or workflow["CAPTCHA_POSITION"] in ("booking", "seat", "lock", "random")) and not r.get(f"defense:sensor:{req.session_id}"):
+        raise HTTPException(status_code=428, detail={"status": "need_sensor", "position": "lock"})
+    if any(workflow[key] for key in ("REQUIRE_LOGIN_BEFORE_QUEUE", "REQUIRE_LOGIN_BEFORE_SEAT", "REQUIRE_LOGIN_BEFORE_LOCK")):
+        user_id = auth_user(req.auth_token, req.session_id)
+        if not user_id:
+            raise HTTPException(status_code=428, detail={"status": "need_login", "position": "lock"})
+        if not req.queue_token:
+            raise HTTPException(status_code=403, detail={"errorCode": "QUEUE_TOKEN_REQUIRED"})
+        import hashlib
+        token_hash = hashlib.sha256(req.queue_token.encode()).hexdigest()[:16]
+        raw = r.get(f"defense:token:{token_hash}")
+        meta = json.loads(raw) if raw else {}
+        if (meta.get("user_id") != user_id or meta.get("session_id") != req.session_id
+                or meta.get("ip") != req.ip or meta.get("event_id") != req.event_id):
+            raise HTTPException(status_code=403, detail={"errorCode": "QUEUE_TOKEN_BIND_MISMATCH"})
+    for position in ("booking", "seat", "lock"):
+        if captcha_required(workflow, req.session_id, req.event_id, position, sensor_score(req.session_id)) and not captcha_passed(req.session_id, req.event_id, position):
+            raise HTTPException(status_code=428, detail={"status": "need_captcha", "position": position})
     # Fetch event config
     config_raw = r.get("defense:config:event")
     if config_raw:
@@ -143,8 +159,10 @@ async def add_to_cart(req: AddToCartRequest):
         }
     
     max_tickets = event_config.get("maxTicketsPerAccount", 4)
-    if req.quantity > max_tickets:
+    if req.quantity < 1 or req.quantity > max_tickets:
         raise HTTPException(status_code=400, detail={"errorCode": "QUANTITY_EXCEEDED", "message": f"Cannot purchase more than {max_tickets} tickets."})
+    if req.ticket_type not in DEFAULT_SEATS:
+        raise HTTPException(status_code=400, detail={"errorCode": "INVALID_SEAT"})
         
     zone = next((z for z in event_config.get("zones", []) if z["id"] == req.ticket_type), None)
     if not zone:
@@ -200,24 +218,21 @@ async def add_to_cart(req: AddToCartRequest):
         log_event("ai", "add_to_cart_blocked", session_id, req.ip, score_data, blocked=True)
         raise HTTPException(status_code=403, detail={"errorCode": "FRAUD_DETECTED", **score_data})
         
-    seat_key = seat_state_key(req.event_id, seat_id)
-    seat_state = get_seat(req.event_id, seat_id)
-    if seat_state.get("status") != "available":
-        raise HTTPException(status_code=409, detail={"errorCode": "SeatAlreadyLocked", "message": "ที่นั่งถูกล็อกโดยผู้อื่นแล้ว"})
-
     cart_id = str(uuid.uuid4())
-    
-    # Mark as locked in Redis
-    r.set(seat_key, json.dumps({"status": "locked", "session_id": session_id, "cart_id": cart_id}))
-    
-    r.setex(f"defense:cart:{cart_id}", SEAT_LOCK_TTL_SEC, json.dumps({
+    cart = {
         "event_id": req.event_id,
         "seat_id": seat_id,
         "quantity": req.quantity,
         "total_price": total_price,
         "session_id": session_id,
         "queue_token": req.queue_token,
-    }))
+    }
+    result = lock_hold(req.event_id, seat_id, cart_id, session_id, req.ip, cart, SEAT_LOCK_TTL_SEC)
+    if result == "abuse_blocked":
+        log_event("seat", "reserve_abuse_blocked", session_id, req.ip, blocked=True)
+        raise HTTPException(status_code=403, detail={"errorCode": "RESERVE_ABUSE_BLOCKED"})
+    if result != "locked":
+        raise HTTPException(status_code=409, detail={"errorCode": "SeatAlreadyLocked", "message": "ที่นั่งถูกล็อกโดยผู้อื่นแล้ว"})
 
     log_event("seat", "seat_locked", session_id, req.ip, {"seat_id": seat_id, "cart_id": cart_id})
     return {"success": True, "cartId": cart_id, "seatId": seat_id, "risk_score": score_data.get("risk_score", 0)}

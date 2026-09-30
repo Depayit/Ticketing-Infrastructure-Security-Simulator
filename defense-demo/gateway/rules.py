@@ -1,4 +1,5 @@
 import json
+import hashlib
 import time
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -10,6 +11,26 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from shared.events import log_event
 from shared.redis_client import r
+from shared.config import EDGE_DDOS_GLOBAL_RPS
+
+
+class EdgeCDNMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "unknown").split(",")[0].strip()
+        key = f"defense:edge:rps:{int(time.time())}"
+        count = r.incr(key)
+        if count == 1:
+            r.expire(key, 2)
+        if count > EDGE_DDOS_GLOBAL_RPS:
+            log_event("edge", "global_rps_blocked", "", ip, {"rps": count}, blocked=True)
+            return JSONResponse({"error": "EDGE_RATE_LIMITED"}, status_code=429)
+        response = await call_next(request)
+        zone = int(hashlib.sha256(ip.encode()).hexdigest()[:4], 16) % 3 + 1
+        response.headers["X-CDN-Edge"] = "defense-lab-bkk"
+        response.headers["X-Cache-Status"] = "BYPASS"
+        response.headers["X-AZ-Zone"] = f"az-bkk-{zone}"
+        response.headers["X-Defense-Lab"] = "simulated"
+        return response
 
 DATACENTER_KEYWORDS = [
     "amazon", "aws", "google", "cloudflare", "microsoft", "azure",

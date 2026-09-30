@@ -1,0 +1,15 @@
+{
+  "uid": "defense-lab",
+  "title": "Defense Lab",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": {"from": "now-30m", "to": "now"},
+  "panels": [
+    {"id": 1, "type": "timeseries", "title": "Blocked requests by layer", "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}, "targets": [{"expr": "sum by (layer) (rate(defense_events_total{blocked=\"1\"}[1m]))", "legendFormat": "{{layer}}"}]},
+    {"id": 2, "type": "timeseries", "title": "Waiting Room size", "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}, "targets": [{"expr": "defense_waiting_room_size", "legendFormat": "waiting"}]},
+    {"id": 3, "type": "stat", "title": "Mean queue wait to admit (ms)", "gridPos": {"h": 5, "w": 8, "x": 0, "y": 8}, "targets": [{"expr": "rate(defense_admit_time_milliseconds_sum[5m]) / clamp_min(rate(defense_admit_time_count[5m]), 0.001)"}]},
+    {"id": 4, "type": "stat", "title": "Expired holds", "gridPos": {"h": 5, "w": 8, "x": 8, "y": 8}, "targets": [{"expr": "defense_hold_expired_total"}]},
+    {"id": 5, "type": "timeseries", "title": "Seat locks and payments", "gridPos": {"h": 5, "w": 8, "x": 16, "y": 8}, "targets": [{"expr": "sum by (action) (rate(defense_events_total{action=~\"seat_locked|payment_committed|qr_payment_committed|payment_committed_bypass\"}[1m]))", "legendFormat": "{{action}}"}]}
+  ]
+}

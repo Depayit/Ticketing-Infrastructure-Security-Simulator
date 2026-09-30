@@ -66,5 +66,9 @@ class BotBypassBlockMiddleware(BaseHTTPMiddleware):
         if path == "/graphql/v2":
             return await call_next(request)
 
+        # Login and CAPTCHA must remain reachable while a funnel gate is active.
+        if path.startswith(("/api/auth/", "/api/captcha/")):
+            return await call_next(request)
+
         # Default: proceed normally
         return await call_next(request)
