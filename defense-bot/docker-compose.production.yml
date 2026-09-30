@@ -1,0 +1,45 @@
+# Use together with docker-compose.defense.yml and --env-file .env.production.
+services:
+  defense-redis:
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "noeviction"]
+    volumes:
+      - defense_redis_data:/data
+    restart: unless-stopped
+
+  fraud-engine:
+    restart: unless-stopped
+
+  queue-service:
+    restart: unless-stopped
+
+  seat-service:
+    restart: unless-stopped
+
+  payment-service:
+    restart: unless-stopped
+
+  gateway:
+    command: uvicorn main:app --host 0.0.0.0 --port 8090 --no-proxy-headers
+    environment:
+      LAB_MODE: production
+      LAB_ADMIN_USER: ${LAB_ADMIN_USER:-admin}
+      LAB_ADMIN_PASSWORD: ${LAB_ADMIN_PASSWORD:?Set LAB_ADMIN_PASSWORD in .env.production}
+    restart: unless-stopped
+
+  prometheus:
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - defense_prometheus_data:/prometheus
+    restart: unless-stopped
+
+  grafana:
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - defense_grafana_data:/var/lib/grafana
+    restart: unless-stopped
+
+volumes:
+  defense_redis_data:
+  defense_prometheus_data:
+  defense_grafana_data:

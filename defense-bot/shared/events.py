@@ -82,11 +82,11 @@ def reset_seats_and_sessions() -> Dict[str, Any]:
 def _reinit_all_seats() -> None:
     """Force all seats back to 'available' in Redis."""
     import json as _json
-    default_event_id = "demo-concert-2026"
-    default_seats = ["VIP", "RED", "RED_RESTRICTED", "BLUE", "YELLOW", "GREEN", "TEAL"]
-    for seat in default_seats:
-        key = f"defense:seat:{default_event_id}:{seat}"
-        r.set(key, _json.dumps({"status": "available", "session_id": "", "cart_id": ""}))
+    from shared.event_state import ZONE_IDS, list_events
+    for event in list_events():
+        for seat in ZONE_IDS:
+            key = f"defense:seat:{event['eventId']}:{seat}"
+            r.set(key, _json.dumps({"status": "available", "session_id": "", "cart_id": ""}))
 
 
 def summarize_audit_events(events: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:

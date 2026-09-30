@@ -6,12 +6,26 @@
     name: "BANGKOK LIVE EXPERIENCE 2026",
   };
 
-  const STORAGE_KEY = "ticket_waiting_room_state";
   const params = new URLSearchParams(location.search);
+  const cookieEvent = document.cookie.split("; ").find(part => part.startsWith("defense_event_id="));
+  const selectedEventId = params.get("eventId") || (cookieEvent ? decodeURIComponent(cookieEvent.split("=")[1]) : EVENT.id);
+  const previousEventId = sessionStorage.getItem("defense_active_event_id");
+  if (previousEventId && previousEventId !== selectedEventId) {
+    for (const key of ["defense_queue_token", "defense_member_code", "defense_cart_id", "defense_selected_seat", "defense_quantity", "defense_show_date", "defense_token_issued_at"]) {
+      localStorage.removeItem(key);
+    }
+    sessionStorage.removeItem("ticket_waiting_room_state:" + selectedEventId);
+    sessionStorage.removeItem("ticket_queue_id:" + selectedEventId);
+  }
+  sessionStorage.setItem("defense_active_event_id", selectedEventId);
+  document.cookie = "defense_event_id=" + encodeURIComponent(selectedEventId) + "; path=/; SameSite=Lax";
+  const STORAGE_KEY = "ticket_waiting_room_state:" + selectedEventId;
+  const SALE_START_KEY = "ticket_sale_start_ms:" + selectedEventId;
+  const QUEUE_ID_KEY = "ticket_queue_id:" + selectedEventId;
   const isDemo = params.get("demo") === "1";
 
   const CONFIG = {
-    eventId: EVENT.id,
+    eventId: selectedEventId,
     eventName: EVENT.name,
     preLoginMinutes: isDemo ? 1 : 30,
     queueDurationMs: isDemo ? 12000 : 45000,
@@ -21,10 +35,10 @@
   };
 
   const now = Date.now();
-  let saleStartMs = parseInt(localStorage.getItem("ticket_sale_start_ms") || "0", 10) || now + (isDemo ? 8000 : 5 * 60 * 1000);
+  let saleStartMs = parseInt(localStorage.getItem(SALE_START_KEY) || "0", 10) || now + (isDemo ? 8000 : 5 * 60 * 1000);
 
-  if (!localStorage.getItem("ticket_sale_start_ms")) {
-    localStorage.setItem("ticket_sale_start_ms", String(saleStartMs));
+  if (!localStorage.getItem(SALE_START_KEY)) {
+    localStorage.setItem(SALE_START_KEY, String(saleStartMs));
   }
 
   let preLoginStartMs = saleStartMs - CONFIG.preLoginMinutes * 60 * 1000;
@@ -79,7 +93,7 @@
   TTMUI.setPageTitle("Waiting Room");
 
   function getOrCreateQueueId() {
-    let id = sessionStorage.getItem("ticket_queue_id");
+    let id = sessionStorage.getItem(QUEUE_ID_KEY);
     if (!id) {
       if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
         id = crypto.randomUUID();
@@ -89,7 +103,7 @@
           return v.toString(16);
         });
       }
-      sessionStorage.setItem("ticket_queue_id", id);
+      sessionStorage.setItem(QUEUE_ID_KEY, id);
     }
     return id;
   }
@@ -383,6 +397,13 @@
       if (!queueJoined) queueJoined = true;
       hideDefenseError();
       const qs = data.data?.queueStatus;
+      if (qs?.status === "denied" && ["EVENT_PAUSED", "EVENT_SOLD_OUT"].includes(qs.reason)) {
+        clearTimers();
+        showPhase(els.phaseTooEarly);
+        if (els.earlyMessage) els.earlyMessage.textContent = qs.reason === "EVENT_PAUSED"
+          ? "อีเวนต์หยุดขายชั่วคราว โปรดรอประกาศจากผู้จัด" : "บัตรสำหรับอีเวนต์นี้หมดแล้ว";
+        return;
+      }
 
       if (qs?.status === "need_sensor") {
         await initAkamaiSensor();
@@ -432,7 +453,7 @@
 
       if (qs?.status === "pre_queue") {
         saleStartMs = qs.startTime * 1000;
-        localStorage.setItem("ticket_sale_start_ms", String(saleStartMs));
+        localStorage.setItem(SALE_START_KEY, String(saleStartMs));
         clearTimers();
         saveState({ inQueue: false, joinedQueue: false, loggedIn: true });
         showCountdown();
@@ -498,7 +519,8 @@
 
   async function boot() {
     try {
-      const configResponse = await fetch("/api/event-config");
+      const configResponse = await fetch("/api/event-config?event_id=" + encodeURIComponent(CONFIG.eventId));
+      if (configResponse.status === 404) { location.href = "/events"; return; }
       if (configResponse.ok) {
         const eventConfig = await configResponse.json();
         workflow = eventConfig.workflow || workflow;
@@ -518,6 +540,13 @@
         joinQueue: false,
       });
       const qs = data?.data?.queueStatus;
+      if (qs?.status === "denied" && ["EVENT_PAUSED", "EVENT_SOLD_OUT"].includes(qs.reason)) {
+        clearTimers();
+        showPhase(els.phaseTooEarly);
+        if (els.earlyMessage) els.earlyMessage.textContent = qs.reason === "EVENT_PAUSED"
+          ? "อีเวนต์หยุดขายชั่วคราว โปรดรอประกาศจากผู้จัด" : "บัตรสำหรับอีเวนต์นี้หมดแล้ว";
+        return;
+      }
       if (qs?.status === "need_sensor") {
         await initAkamaiSensor();
       }
@@ -531,7 +560,7 @@
       }
       if (qs?.status === "pre_queue" && qs?.startTime) {
         saleStartMs = qs.startTime * 1000;
-        localStorage.setItem("ticket_sale_start_ms", String(saleStartMs));
+        localStorage.setItem(SALE_START_KEY, String(saleStartMs));
       } else if (qs?.startTime === 0) {
         saleStartMs = Date.now() - 1000; // already started
       }

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Defense Live — อีเวนต์ทั้งหมด</title>
+  <link rel="stylesheet" href="/static/ticket.css">
+  <link rel="stylesheet" href="/static/site.css">
+</head>
+<body class="storefront-page">
+  <div class="utility-bar"><span>DEFENSE LIVE / LIVE EVENTS</span><span>เว็บไซต์จำลองสำหรับการทดสอบระบบ</span></div>
+  <header class="Ticket-header"><a class="ticket-logo" href="/events"><div class="ticket-logo-main"><span class="ticket-logo-badge">D</span><span>DEFENSE LIVE</span></div><span class="ticket-logo-sub">TICKETING SIMULATOR</span></a><span class="header-sim-label">SIMULATION</span></header>
+  <main class="Ticket-main" style="max-width:1100px; margin:48px auto; min-height:65vh;">
+    <span class="section-kicker">DISCOVER EVENTS</span>
+    <h1 class="Ticket-event-title">อีเวนต์ในแล็บ</h1>
+    <p class="Ticket-copy">เลือกอีเวนต์เพื่อเข้าสู่ห้องรอซื้อบัตร ระบบนี้เป็นการจำลอง ไม่มีการชำระเงินจริง</p>
+    <div id="event-list" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:18px; margin-top:28px;"><p>กำลังโหลดอีเวนต์...</p></div>
+  </main>
+  <footer class="Ticket-footer"><span class="footer-brand">DEFENSE LIVE</span><span class="footer-note">ระบบจำลองสำหรับการศึกษาและทดสอบ</span></footer>
+  <script>
+    const labels = {open:"เปิดขาย", paused:"พักการขาย", sold_out:"บัตรหมด"};
+    fetch("/api/events").then(response => {
+      if (!response.ok) throw new Error("โหลดอีเวนต์ไม่สำเร็จ");
+      return response.json();
+    }).then(({events}) => {
+      const list = document.getElementById("event-list");
+      list.replaceChildren(...events.map(event => {
+        const card = document.createElement("article");
+        card.style.cssText = "background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:24px;box-shadow:0 8px 24px #0f172a0d";
+        const title = document.createElement("h2"); title.textContent = event.eventName;
+        const status = document.createElement("p"); status.textContent = labels[event.saleStatus] || event.saleStatus;
+        const price = document.createElement("p"); price.textContent = "เริ่มต้น ฿" + event.startingPrice.toLocaleString("th-TH");
+        const link = document.createElement("a"); link.className = "ticket-btn"; link.href = "/?eventId=" + encodeURIComponent(event.eventId); link.textContent = "ดูอีเวนต์";
+        card.append(title, status, price, link);
+        return card;
+      }));
+    }).catch(error => document.getElementById("event-list").textContent = error.message);
+  </script>
+</body>
+</html>

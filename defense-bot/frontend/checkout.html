@@ -293,12 +293,18 @@
             <path d="M14 14h6v6h-6zM28 14h6v6h-6zM14 28h6v6h-6z" fill="#1d4ed8"/>
             <path d="M28 28h2v2h-2zM32 28h2v2h-2zM28 32h2v2h-2zM32 32h2v2h-2z" fill="#1d4ed8"/>
           </svg>
-          <h2>สแกนเพื่อชำระเงิน</h2>
+          <h2>จำลองการชำระผ่าน QR</h2>
         </div>
-        <p class="otp-desc">กรุณาสแกน QR Code เพื่อชำระเงิน<br>รายการจะเสร็จสิ้นอัตโนมัติเมื่อชำระเงินสำเร็จ</p>
+        <p class="otp-desc">หน้าจอนี้ใช้สำหรับทดสอบขั้นตอนการชำระเงินเท่านั้น<br>กดปุ่มด้านล่างเพื่อจำลองการจ่ายสำเร็จ ไม่มีการโอนเงินจริง</p>
         
         <div style="margin: 20px auto; padding: 15px; border: 2px dashed #93c5fd; border-radius: 12px; width: fit-content; background: #eff6ff;">
-          <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=mock_qr_payment" alt="QR Code" style="display: block; margin: 0 auto; width: 150px; height: 150px;" />
+          <svg viewBox="0 0 150 150" role="img" aria-label="สัญลักษณ์การชำระเงินจำลอง" style="display:block; margin:0 auto; width:150px; height:150px;" xmlns="http://www.w3.org/2000/svg">
+            <rect width="150" height="150" rx="12" fill="white"/>
+            <path d="M18 18h38v38H18zM94 18h38v38H94zM18 94h38v38H18z" fill="none" stroke="#1d4ed8" stroke-width="8"/>
+            <path d="M28 28h18v18H28zM104 28h18v18h-18zM28 104h18v18H28zM72 22h8v8h-8zM72 42h8v8h-8zM72 62h8v8h-8zM92 74h8v8h-8zM112 74h8v8h-8zM72 94h8v8h-8zM92 94h8v8h-8zM112 94h8v8h-8zM72 114h8v8h-8zM112 114h8v8h-8z" fill="#1d4ed8"/>
+            <rect x="40" y="63" width="70" height="25" rx="5" fill="#eff6ff" stroke="#1d4ed8"/>
+            <text x="75" y="80" text-anchor="middle" font-size="13" font-weight="700" fill="#1d4ed8">LAB DEMO</text>
+          </svg>
         </div>
 
         <button id="btn-verify-qr" class="btn-confirm-order" style="background: #1d4ed8; width: 100%;">

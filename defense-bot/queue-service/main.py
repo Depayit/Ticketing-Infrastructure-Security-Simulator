@@ -11,8 +11,9 @@ from pydantic import BaseModel
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from admission import admission, issue_once, member_id
-from shared.config import ADMISSION_RATE, BOT_SCORE_ADMIT_MAX, MOCK_CAPTCHA_SITEKEY
+from shared.config import ADMISSION_RATE, BOT_SCORE_ADMIT_MAX, DEFAULT_EVENT_ID, MOCK_CAPTCHA_SITEKEY
 from shared.events import log_event
+from shared.event_state import sale_status
 from shared.redis_client import r
 from shared.workflow import auth_user, captcha_passed, captcha_required, get_workflow, sensor_score
 
@@ -41,6 +42,10 @@ def health():
 @app.post("/internal/queue-status")
 def queue_status(req: QueueStatusRequest, request: Request):
     ip = req.ip or (request.client.host if request.client else "unknown")
+    status = sale_status(req.event_id)
+    if status != "open":
+        reason = {"paused": "EVENT_PAUSED", "sold_out": "EVENT_SOLD_OUT", "missing": "EVENT_NOT_FOUND"}.get(status, "EVENT_PAUSED")
+        return {"status": "denied", "reason": reason, "token": ""}
     workflow = get_workflow()
     if not r.get(f"defense:sensor:{req.session_id}"):
         return {"status": "need_sensor", "position": "queue", "token": ""}
@@ -51,7 +56,8 @@ def queue_status(req: QueueStatusRequest, request: Request):
     if captcha_required(workflow, req.session_id, req.event_id, "queue", bot_score) and not captcha_passed(req.session_id, req.event_id, "queue"):
         return {"status": "need_captcha", "position": "queue", "token": ""}
 
-    sale_start_raw = r.get("defense:config:sale_start")
+    suffix = "" if req.event_id == DEFAULT_EVENT_ID else f":{req.event_id}"
+    sale_start_raw = r.get("defense:config:sale_start" + suffix)
     sale_start = float(sale_start_raw) if sale_start_raw else 0.0
     
     if sale_start > time.time():
@@ -79,7 +85,7 @@ def queue_status(req: QueueStatusRequest, request: Request):
         return {"status": "denied", "token": "", "reason": "BOT_SCORE_TOO_HIGH", "botScore": bot_score}
     member = member_id(req.event_id, req.session_id)
     if mode != "off":
-        soft_seconds = int(r.get("defense:config:soft_open_seconds") or 0)
+        soft_seconds = int(r.get("defense:config:soft_open_seconds" + suffix) or 0)
         effective_rate = max(1, ADMISSION_RATE // 4) if soft_seconds and sale_start <= time.time() < sale_start + soft_seconds else ADMISSION_RATE
         admitted, position, member = admission(req.event_id, req.session_id, bot_score, mode, effective_rate)
         if not admitted:

@@ -1,5 +1,6 @@
 import json
 import hashlib
+import os
 import sys
 import time
 from pathlib import Path
@@ -13,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from gateway.admin_auth import admin_auth
 
 # --- Resilient imports for incomplete demo modules (added for bot testing) ---
 try:
@@ -60,7 +62,6 @@ except Exception:
 from shared.config import (
     AUTH_SESSION_TTL_SEC,
     DEFAULT_EVENT_ID,
-    DEFAULT_EVENT_NAME,
     PAYMENT_SERVICE_URL,
     QUEUE_SERVICE_URL,
     SEAT_SERVICE_URL,
@@ -80,6 +81,9 @@ except Exception:
     if 'log_event' not in dir():
         from shared.events import log_event  # type: ignore
 from shared.redis_client import r
+from shared.event_state import (DEFAULT_EVENT, EVENTS_KEY, list_events, load_event,
+                                validate_event_id, validate_event_update)
+from shared.request_identity import client_identity
 from shared.workflow import (
     GATE_POSITIONS, auth_user, captcha_passed, captcha_required,
     create_auth, get_workflow, new_challenge, verify_challenge,
@@ -89,13 +93,10 @@ app = FastAPI(title="Defense Gateway")
 app.add_middleware(WAFMiddleware)
 app.add_middleware(BotBypassBlockMiddleware)
 app.add_middleware(EdgeCDNMiddleware)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-    allow_credentials=True,
-)
+if os.getenv("LAB_MODE") != "production":
+    app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+app.middleware("http")(admin_auth)
 
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
 if FRONTEND.exists():
@@ -109,10 +110,7 @@ class SensorSubmit(BaseModel):
 
 
 def client_ip(request: Request) -> str:
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+    return client_identity(request)
 
 
 def session_id_from_request(request: Request) -> str:
@@ -156,9 +154,8 @@ def _gate_response(request: Request, position: str, event_id: str = DEFAULT_EVEN
     return JSONResponse(gate, status_code=428) if gate else None
 
 
-def active_event_id() -> str:
-    raw = r.get("defense:config:event")
-    return json.loads(raw).get("eventId", DEFAULT_EVENT_ID) if raw else DEFAULT_EVENT_ID
+def active_event_id(request: Request = None) -> str:
+    return request.cookies.get("defense_event_id", DEFAULT_EVENT_ID) if request else DEFAULT_EVENT_ID
 
 
 def cart_event_id(cart_id: str) -> str:
@@ -257,6 +254,38 @@ def admin_events(limit: int = 100):
     return {"events": events, "stats": summarize_audit_events(events)}
 
 
+@app.get("/api/events")
+def event_catalog():
+    return {"events": [{"eventId": event["eventId"], "eventName": event["eventName"],
+                        "saleStatus": event.get("saleStatus", "open"),
+                        "startingPrice": min(zone["price"] for zone in event["zones"])}
+                       for event in list_events()]}
+
+
+@app.get("/admin/api/catalog")
+def admin_catalog():
+    return {"events": list_events()}
+
+
+@app.post("/admin/api/catalog", status_code=201)
+async def admin_create_event(request: Request):
+    data = await request.json()
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=422, detail="event must be an object")
+    try:
+        event_id = validate_event_id(data.pop("eventId", ""))
+        update = validate_event_update(data)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if "eventName" not in update:
+        raise HTTPException(status_code=422, detail="eventName is required")
+    event = {**DEFAULT_EVENT, **update, "eventId": event_id}
+    if event_id == DEFAULT_EVENT_ID or not r.hsetnx(EVENTS_KEY, event_id, json.dumps(event)):
+        raise HTTPException(status_code=409, detail="eventId already exists")
+    log_event("edge", "admin_create_event", "", client_ip(request), {"eventId": event_id})
+    return {"event": event}
+
+
 @app.post("/admin/api/clear-all")
 def admin_clear_all():
     result = clear_all_defense_data()
@@ -275,16 +304,22 @@ def admin_reset_seats():
 class SaleStartRequest(BaseModel):
     delay_seconds: int
     soft_open_seconds: int = 0
+    event_id: str = DEFAULT_EVENT_ID
 
 @app.post("/admin/api/set-sale-start")
 async def admin_set_sale_start(req: SaleStartRequest, request: Request):
     """Set the sale start time (pre-queue countdown)."""
+    if not load_event(req.event_id):
+        raise HTTPException(status_code=404, detail="event not found")
     start_time = time.time() + req.delay_seconds
-    r.set("defense:config:sale_start", str(start_time))
-    r.set("defense:config:soft_open_seconds", str(max(0, req.soft_open_seconds)))
+    suffix = "" if req.event_id == DEFAULT_EVENT_ID else f":{req.event_id}"
+    r.set("defense:config:sale_start" + suffix, str(start_time))
+    r.set("defense:config:soft_open_seconds" + suffix, str(max(0, req.soft_open_seconds)))
     log_event("edge", "admin_set_sale_start", "", client_ip(request), {"start_time": start_time,
-                                                                         "soft_open_seconds": req.soft_open_seconds}, blocked=False)
-    return {"success": True, "sale_start": start_time, "soft_open_seconds": req.soft_open_seconds}
+                                                                         "soft_open_seconds": req.soft_open_seconds,
+                                                                         "event_id": req.event_id}, blocked=False)
+    return {"success": True, "sale_start": start_time, "soft_open_seconds": req.soft_open_seconds,
+            "event_id": req.event_id}
 
 class SimulationRequest(BaseModel):
     enabled: bool
@@ -301,27 +336,11 @@ def get_workflow_config() -> dict:
 
 
 @app.get("/api/event-config")
-def get_event_config():
-    raw = r.get("defense:config:event")
-    if raw:
-        event = json.loads(raw)
-        event["workflow"] = get_workflow_config()
-        return event
-    return {
-        "eventId": DEFAULT_EVENT_ID,
-        "eventName": DEFAULT_EVENT_NAME,
-        "maxTicketsPerAccount": 4,
-        "zones": [
-            {"id": "VIP", "name": "VIP (V1-V16)", "price": 7800, "color": "#c084fc", "isRestricted": False},
-            {"id": "RED", "name": "Red Zone (A1-A24)", "price": 6800, "color": "#ef4444", "isRestricted": False},
-            {"id": "RED_RESTRICTED", "name": "Red (Restricted View)", "price": 6800, "color": "#991b1b", "isRestricted": True},
-            {"id": "BLUE", "name": "Blue Zone", "price": 6300, "color": "#3b82f6", "isRestricted": False},
-            {"id": "YELLOW", "name": "Yellow/Orange Zone", "price": 5300, "color": "#eab308", "isRestricted": False},
-            {"id": "GREEN", "name": "Green Zone", "price": 4300, "color": "#22c55e", "isRestricted": False},
-            {"id": "TEAL", "name": "Teal/Light Blue Zone", "price": 3300, "color": "#14b8a6", "isRestricted": False}
-        ],
-        "workflow": get_workflow_config(),
-    }
+def get_event_config(request: Request, event_id: str = ""):
+    event = load_event(event_id or active_event_id(request))
+    if not event:
+        raise HTTPException(status_code=404, detail="event not found")
+    return {**event, "workflow": get_workflow_config()}
 
 
 def get_defense_toggles() -> dict:
@@ -408,6 +427,12 @@ async def update_event_config(request: Request):
     if not isinstance(data, dict):
         raise HTTPException(status_code=422, detail="event config must be an object")
     workflow_input = data.pop("workflow", None)
+    event_id = data.pop("eventId", DEFAULT_EVENT_ID)
+    try:
+        validate_event_id(event_id)
+        event_update = validate_event_update(data)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     old_workflow = get_workflow_config()
     workflow = old_workflow
     if workflow_input is not None:
@@ -415,11 +440,15 @@ async def update_event_config(request: Request):
             workflow = normalize_workflow(workflow_input, old_workflow)
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
-    event = get_event_config()
-    event.pop("workflow", None)
-    event.update(data)
+    event = load_event(event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="event not found")
+    event.update(event_update)
     pipe = r.pipeline()
-    pipe.set("defense:config:event", json.dumps(event))
+    if event_id == DEFAULT_EVENT_ID:
+        pipe.set("defense:config:event", json.dumps(event))
+    else:
+        pipe.hset(EVENTS_KEY, event_id, json.dumps(event))
     pipe.set(WORKFLOW_CONFIG_KEY, json.dumps(workflow))
     if workflow["QUEUE_MODE"] != old_workflow["QUEUE_MODE"]:
         waiting_keys = list(r.scan_iter(match="defense:waiting:*"))
@@ -514,7 +543,7 @@ async def challenge_pass(request: Request):
     async with httpx.AsyncClient(timeout=10.0) as client:
         await client.post(
             f"{QUEUE_SERVICE_URL}/internal/challenge-pass",
-            json={"session_id": session_id, "event_id": DEFAULT_EVENT_ID},
+            json={"session_id": session_id, "event_id": active_event_id(request)},
         )
 
     fingerprint = ""
@@ -621,7 +650,7 @@ async def captcha_verify(request: Request):
 
 @app.get("/member-code")
 def member_code_page(request: Request):
-    gate = _gate_status(request, "booking", active_event_id())
+    gate = _gate_status(request, "booking", active_event_id(request))
     if not gate and _login_required(get_workflow_config(), "seat") and not current_user(request):
         gate = {"status": "need_login", "position": "seat"}
     if gate:
@@ -631,7 +660,7 @@ def member_code_page(request: Request):
 
 @app.get("/seats")
 def seats_page(request: Request):
-    gate = _gate_status(request, "seat", active_event_id())
+    gate = _gate_status(request, "seat", active_event_id(request))
     if gate:
         return _page_gate_redirect(gate, "/seats")
     return FileResponse(str(FRONTEND / "seat-map.html"))
@@ -639,7 +668,7 @@ def seats_page(request: Request):
 
 @app.get("/checkout")
 def checkout_page(request: Request):
-    gate = _gate_status(request, "checkout", active_event_id())
+    gate = _gate_status(request, "checkout", active_event_id(request))
     if gate:
         return _page_gate_redirect(gate, "/checkout")
     return FileResponse(str(FRONTEND / "checkout.html"))
@@ -655,6 +684,11 @@ def checkout_html_alias(request: Request):
 @app.get("/")
 def index():
     return FileResponse(str(FRONTEND / "waiting-room.html"))
+
+
+@app.get("/events")
+def events_page():
+    return FileResponse(str(FRONTEND / "events.html"))
 
 
 @app.get("/m")
@@ -747,7 +781,9 @@ async def _handle_add_to_cart(
             status_code=403,
         )
     if resp.status_code == 409:
-        return {"success": False, "errorCode": "SeatAlreadyLocked"}
+        return {"success": False, "errorCode": resp.json().get("detail", {}).get("errorCode", "SeatAlreadyLocked")}
+    if resp.status_code >= 400:
+        return JSONResponse({"errors": [{"message": resp.json().get("detail", {}).get("errorCode", "BOOKING_FAILED")}]}, status_code=resp.status_code)
     data = resp.json()
     return {"success": data.get("success"), "cartId": data.get("cartId")}
 
@@ -951,4 +987,4 @@ async def seats_proxy(event_id: str, request: Request):
         return gate
     async with httpx.AsyncClient(timeout=10.0) as client:
         resp = await client.get(f"{SEAT_SERVICE_URL}/internal/seats/{event_id}")
-        return resp.json()
+        return JSONResponse(resp.json(), status_code=resp.status_code)

@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from shared.config import DEFAULT_EVENT_ID, FRAUD_ENGINE_URL, SEAT_LOCK_TTL_SEC
 from shared.events import log_event
+from shared.event_state import list_events, load_event, sale_status
 from shared.redis_client import r
 from shared.workflow import auth_user, captcha_passed, captcha_required, get_workflow, sensor_score
 from shared.seat_state import lock_hold, read_seat, release_hold
@@ -49,10 +50,9 @@ async def simulate_concurrent_booking():
 async def sweep_expired_holds():
     while True:
         await asyncio.sleep(5)
-        raw = r.get("defense:config:event")
-        event_id = json.loads(raw).get("eventId", DEFAULT_EVENT_ID) if raw else DEFAULT_EVENT_ID
-        for seat in DEFAULT_SEATS:
-            get_seat(event_id, seat)
+        for event in list_events():
+            for seat in DEFAULT_SEATS:
+                get_seat(event["eventId"], seat)
 
 @app.on_event("startup")
 async def startup_event():
@@ -111,6 +111,8 @@ def health():
 
 @app.get("/internal/seats/{event_id}")
 def list_seats(event_id: str):
+    if not load_event(event_id):
+        raise HTTPException(status_code=404, detail="EVENT_NOT_FOUND")
     init_seats(event_id)
     out = []
     for seat in DEFAULT_SEATS:
@@ -128,6 +130,10 @@ def ingest_telemetry(batch: TelemetryBatch):
 
 @app.post("/internal/add-to-cart")
 async def add_to_cart(req: AddToCartRequest):
+    status = sale_status(req.event_id)
+    if status != "open":
+        error = {"paused": "EVENT_PAUSED", "sold_out": "EVENT_SOLD_OUT", "missing": "EVENT_NOT_FOUND"}.get(status, "EVENT_PAUSED")
+        raise HTTPException(status_code=409, detail={"errorCode": error})
     workflow = get_workflow()
     if (any(workflow[key] for key in ("REQUIRE_LOGIN_BEFORE_QUEUE", "REQUIRE_LOGIN_BEFORE_SEAT", "REQUIRE_LOGIN_BEFORE_LOCK"))
             or workflow["CAPTCHA_POSITION"] in ("booking", "seat", "lock", "random")) and not r.get(f"defense:sensor:{req.session_id}"):
@@ -149,14 +155,7 @@ async def add_to_cart(req: AddToCartRequest):
         if captcha_required(workflow, req.session_id, req.event_id, position, sensor_score(req.session_id)) and not captcha_passed(req.session_id, req.event_id, position):
             raise HTTPException(status_code=428, detail={"status": "need_captcha", "position": position})
     # Fetch event config
-    config_raw = r.get("defense:config:event")
-    if config_raw:
-        event_config = json.loads(config_raw)
-    else:
-        event_config = {
-            "maxTicketsPerAccount": 4,
-            "zones": [{"id": req.ticket_type, "price": 1000}]
-        }
+    event_config = load_event(req.event_id)
     
     max_tickets = event_config.get("maxTicketsPerAccount", 4)
     if req.quantity < 1 or req.quantity > max_tickets:
@@ -166,7 +165,7 @@ async def add_to_cart(req: AddToCartRequest):
         
     zone = next((z for z in event_config.get("zones", []) if z["id"] == req.ticket_type), None)
     if not zone:
-        zone = {"id": req.ticket_type, "price": 1000}
+        raise HTTPException(status_code=400, detail={"errorCode": "INVALID_SEAT"})
     
     total_price = zone["price"] * req.quantity
 

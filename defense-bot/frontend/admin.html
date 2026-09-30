@@ -157,6 +157,18 @@
     <h1 id="event-name" class="Ticket-event-title" style="text-align:left;"></h1>
     <p class="Ticket-copy" style="text-align:left;">Real-time events จาก Edge · IP · Akamai · Queue · AI · 3DS</p>
 
+    <section style="background:#fff; border:1px solid var(--border-light); border-radius:12px; padding:16px; margin-bottom:20px; display:grid; gap:12px;">
+      <label for="admin-event-select" style="font-weight:bold;">อีเวนต์ที่กำลังจัดการ</label>
+      <select id="admin-event-select" style="padding:10px; border:1px solid #ccc; border-radius:6px;"></select>
+      <a id="admin-event-preview" href="/" target="_blank" rel="noopener">เปิดหน้าอีเวนต์นี้</a>
+      <div style="display:flex; flex-wrap:wrap; gap:8px;">
+        <input id="new-event-id" type="text" maxlength="48" pattern="[a-z0-9][a-z0-9-]{2,47}" placeholder="รหัสอีเวนต์ เช่น concert-2027" style="flex:1; min-width:190px; padding:10px; border:1px solid #ccc; border-radius:6px;" />
+        <input id="new-event-name" type="text" maxlength="120" placeholder="ชื่ออีเวนต์ใหม่" style="flex:2; min-width:190px; padding:10px; border:1px solid #ccc; border-radius:6px;" />
+        <button type="button" id="btn-create-event" class="btn-config">+ เพิ่มอีเวนต์</button>
+      </div>
+      <small>แต่ละอีเวนต์มีคิว ที่นั่ง ราคา สถานะขาย และเวลาเปิดขายของตนเอง ระบบป้องกันและ Workflow Profile เป็นค่าร่วมของแล็บ</small>
+    </section>
+
     <div class="admin-toolbar">
       <div class="stats-grid">
         <div class="stat-card total">
@@ -211,6 +223,15 @@
           <input type="text" id="cfg-event-name" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
         </div>
         <div style="margin-bottom:12px;">
+          <label for="cfg-sale-status" style="display:block; font-weight:bold; margin-bottom:4px;">สถานะการขาย</label>
+          <select id="cfg-sale-status" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;">
+            <option value="open">เปิดขาย / เปิดคิว</option>
+            <option value="paused">พักการขายชั่วคราว</option>
+            <option value="sold_out">บัตรหมด</option>
+          </select>
+          <small>เมื่อพักหรือบัตรหมด จะหยุดการเข้าคิวและการล็อกที่นั่งใหม่ รายการที่ล็อกไว้แล้วชำระต่อได้</small>
+        </div>
+        <div style="margin-bottom:12px;">
           <label style="display:block; font-weight:bold; margin-bottom:4px;">จำนวนที่ซื้อได้สูงสุดต่อ 1 บัญชี (Max Tickets)</label>
           <input type="number" id="cfg-max-tickets" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
         </div>
@@ -220,7 +241,7 @@
         </div>
         <fieldset style="margin-bottom:16px; border:1px solid #ddd; border-radius:8px;">
           <legend>Workflow Profile</legend>
-          <p style="font-size:12px; color:#666;">Login Gate และ CAPTCHA ใช้งานตามตำแหน่งที่เลือกแล้ว; priority_score ยังรอ Phase 4</p>
+          <p style="font-size:12px; color:#666;">Workflow Profile นี้ใช้ร่วมกันทุกอีเวนต์ในแล็บ</p>
           <label>Profile <select id="cfg-workflow-profile"><option value="custom">custom (ค่าเดิม)</option><option value="A">A — Queue → Login → Seat</option><option value="B">B — Login → Queue → Seat</option><option value="C">C — Random CAPTCHA</option><option value="D">D — Full lockdown</option></select></label>
           <div id="cfg-workflow-custom" style="display:grid; gap:8px; margin-top:12px;">
             <label><input type="checkbox" id="cfg-login-queue"> Login ก่อน Waiting Room</label>
@@ -270,6 +291,10 @@
     let currentPage = 1;
     const itemsPerPage = 100;
 
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, c => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"})[c]);
+    }
+
     function showToast(msg) {
       const el = document.getElementById("toast");
       el.textContent = msg;
@@ -305,7 +330,7 @@
         return;
       }
       tbody.innerHTML = paginated.map((e) => {
-        const layer = (e.layer || "").replace("3ds", "3ds");
+        const layer = String(e.layer || "").replace(/[^a-z0-9_-]/gi, "");
         const pass = !e.blocked;
         const rowClass = pass ? "row-pass" : "row-fail";
         const badge = pass
@@ -314,10 +339,10 @@
         return `<tr class="${rowClass} layer-${layer}">
           <td>${new Date(e.ts * 1000).toLocaleTimeString("th-TH")}</td>
           <td>${badge}</td>
-          <td>${e.layer || "-"}</td>
-          <td class="${pass ? "" : "action-fail"}">${e.action}</td>
-          <td>${e.ip || "-"}</td>
-          <td><code>${JSON.stringify(e.detail || {}).slice(0, 120)}</code></td>
+          <td>${escapeHtml(e.layer || "-")}</td>
+          <td class="${pass ? "" : "action-fail"}">${escapeHtml(e.action || "-")}</td>
+          <td>${escapeHtml(e.ip || "-")}</td>
+          <td><code>${escapeHtml(JSON.stringify(e.detail || {}).slice(0, 120))}</code></td>
         </tr>`;
       }).join("");
 
@@ -372,13 +397,50 @@
     });
 
     let currentEventConfig = {};
+    let selectedEventId = window.ticket_EVENT?.id || "demo-concert-2026";
+    const eventSelect = document.getElementById("admin-event-select");
+    async function loadCatalog() {
+      const res = await fetch("/admin/api/catalog");
+      if (!res.ok) throw new Error("โหลดรายการอีเวนต์ไม่สำเร็จ");
+      const catalog = (await res.json()).events;
+      if (!catalog.some(event => event.eventId === selectedEventId)) selectedEventId = catalog[0].eventId;
+      eventSelect.replaceChildren(...catalog.map(event => {
+        const option = document.createElement("option");
+        option.value = event.eventId;
+        option.textContent = event.eventName + " (" + event.saleStatus + ")";
+        return option;
+      }));
+      eventSelect.value = selectedEventId;
+      document.getElementById("admin-event-preview").href = "/?eventId=" + encodeURIComponent(selectedEventId);
+      document.getElementById("event-name").textContent = catalog.find(event => event.eventId === selectedEventId)?.eventName || "";
+    }
+    eventSelect.addEventListener("change", () => {
+      selectedEventId = eventSelect.value;
+      loadCatalog().catch(error => showToast(error.message));
+    });
+    document.getElementById("btn-create-event").addEventListener("click", async () => {
+      const eventId = document.getElementById("new-event-id").value.trim();
+      const eventName = document.getElementById("new-event-name").value.trim();
+      try {
+        const res = await fetch("/admin/api/catalog", {method:"POST", headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({eventId, eventName})});
+        const body = await res.json();
+        if (!res.ok) throw new Error(body.detail || "เพิ่มอีเวนต์ไม่สำเร็จ");
+        selectedEventId = body.event.eventId;
+        document.getElementById("new-event-id").value = "";
+        document.getElementById("new-event-name").value = "";
+        await loadCatalog();
+        showToast("เพิ่มอีเวนต์แล้ว");
+      } catch (error) { showToast(error.message); }
+    });
     const configModal = document.getElementById("config-modal");
     document.getElementById("btn-config").addEventListener("click", async () => {
       try {
-        const res = await fetch("/api/event-config");
+        const res = await fetch("/api/event-config?event_id=" + encodeURIComponent(selectedEventId));
         if (res.ok) {
           currentEventConfig = await res.json();
           document.getElementById("cfg-event-name").value = currentEventConfig.eventName || "";
+          document.getElementById("cfg-sale-status").value = currentEventConfig.saleStatus || "open";
           document.getElementById("cfg-max-tickets").value = currentEventConfig.maxTicketsPerAccount || 4;
           document.getElementById("cfg-zones-json").value = JSON.stringify(currentEventConfig.zones || [], null, 2);
           const workflow = currentEventConfig.workflow || {};
@@ -409,6 +471,7 @@
     document.getElementById("btn-save-config").addEventListener("click", async () => {
       try {
         const eventName = document.getElementById("cfg-event-name").value;
+        const saleStatus = document.getElementById("cfg-sale-status").value;
         const maxTickets = parseInt(document.getElementById("cfg-max-tickets").value, 10);
         const zones = JSON.parse(document.getElementById("cfg-zones-json").value);
         const profile = document.getElementById("cfg-workflow-profile").value;
@@ -423,8 +486,9 @@
         } : { WORKFLOW_PROFILE: profile };
         
         const payload = {
-          ...currentEventConfig,
+          eventId: selectedEventId,
           eventName,
+          saleStatus,
           maxTicketsPerAccount: maxTickets,
           zones,
           workflow
@@ -437,6 +501,9 @@
         });
         
         if (res.ok) {
+          currentEventConfig = (await res.json()).config;
+          document.getElementById("event-name").textContent = currentEventConfig.eventName;
+          await loadCatalog();
           showToast("บันทึกการตั้งค่าแล้ว", "success");
           configModal.style.display = "none";
         } else {
@@ -449,7 +516,7 @@
     });
 
     document.getElementById("btn-clear-all").addEventListener("click", async () => {
-      if (!confirm("ล้างข้อมูล Defense ทั้งหมด?\n\nรวม audit log, คิว, ที่นั่ง, cart, session, ban — ไม่สามารถย้อนกลับได้")) return;
+      if (!confirm("ล้างข้อมูล Defense ทั้งหมด?\n\nรวมอีเวนต์ที่เพิ่ม, audit log, คิว, ที่นั่ง, cart, session, ban — ไม่สามารถย้อนกลับได้")) return;
       const btn = document.getElementById("btn-clear-all");
       btn.disabled = true;
       try {
@@ -461,6 +528,7 @@
         renderRows([]);
         showToast("ล้างข้อมูลแล้ว (" + (data.deleted_keys || 0) + " keys)");
         await refresh();
+        await loadCatalog();
       } catch (e) {
         showToast("ล้างข้อมูลไม่สำเร็จ: " + (e.message || e));
       } finally {
@@ -554,7 +622,7 @@
         const res = await fetch("/admin/api/set-sale-start", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ delay_seconds: 60 })
+          body: JSON.stringify({ delay_seconds: 60, event_id: selectedEventId })
         });
         if (res.ok) showToast("ตั้งเวลาเปิดขายล่วงหน้า 1 นาทีแล้ว (Pre-Queue)");
       } catch (e) {
@@ -564,11 +632,12 @@
 
     document.getElementById("btn-soft-open").addEventListener("click", async () => {
       const res = await fetch("/admin/api/set-sale-start", {method:"POST", headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({delay_seconds:0, soft_open_seconds:30})});
+        body:JSON.stringify({delay_seconds:0, soft_open_seconds:30, event_id:selectedEventId})});
       showToast(res.ok ? "เริ่ม Soft-open แล้ว (25% admit rate)" : "เริ่ม Soft-open ไม่สำเร็จ");
     });
 
     loadToggles();
+    loadCatalog().catch(error => showToast(error.message));
     refresh();
     setInterval(refresh, 2000);
   </script>

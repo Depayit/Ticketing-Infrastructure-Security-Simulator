@@ -22,7 +22,8 @@
   // Fetch Event Config dynamically
   (async function() {
     try {
-      const res = await fetch("/api/event-config");
+      const chosenEvent = sessionStorage.getItem("defense_active_event_id") || "demo-concert-2026";
+      const res = await fetch("/api/event-config?event_id=" + encodeURIComponent(chosenEvent));
       if (res.ok) {
         const config = await res.json();
         document.getElementById("event-name").textContent = config.eventName;
@@ -147,7 +148,8 @@
     localStorage.removeItem("defense_selected_seat");
     localStorage.removeItem("defense_quantity");
     localStorage.removeItem("defense_show_date");
-    sessionStorage.removeItem("ticket_waiting_room_state");
+    const chosenEvent = sessionStorage.getItem("defense_active_event_id") || "demo-concert-2026";
+    sessionStorage.removeItem("ticket_waiting_room_state:" + chosenEvent);
     
     alert("การชำระเงินเสร็จสิ้น! ระบบจะนำคุณกลับไปหน้าห้องล็อกอิน");
     location.href = "/";

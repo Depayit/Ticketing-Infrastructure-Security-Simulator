@@ -10,7 +10,8 @@
   // Fetch Event Config dynamically
   let eventConfig = { eventId: "demo-concert-2026", eventName: "Event", maxTicketsPerAccount: 1, zones: [] };
   try {
-    const res = await fetch("/api/event-config");
+    const chosenEvent = sessionStorage.getItem("defense_active_event_id") || "demo-concert-2026";
+    const res = await fetch("/api/event-config?event_id=" + encodeURIComponent(chosenEvent));
     if (res.ok) eventConfig = await res.json();
   } catch (e) {
     console.warn("Failed to fetch event config, using defaults", e);
@@ -66,14 +67,19 @@
       d.className = "seat available";
       d.dataset.zoneColor = z.color;
       d.style.setProperty("--zone-color", z.color);
-      const restrictedHtml = z.isRestricted ? '<span class="restricted-view">มุมมองจำกัด</span>' : '';
-      
-      d.innerHTML =
-        '<span class="seat-label">' +
-        z.name +
-        '</span><span class="seat-status">฿' +
-        z.price.toLocaleString() +
-        "</span>" + restrictedHtml;
+      const label = document.createElement("span");
+      label.className = "seat-label";
+      label.textContent = z.name;
+      const price = document.createElement("span");
+      price.className = "seat-status";
+      price.textContent = "฿" + z.price.toLocaleString();
+      d.append(label, price);
+      if (z.isRestricted) {
+        const badge = document.createElement("span");
+        badge.className = "restricted-view";
+        badge.textContent = "มุมมองจำกัด";
+        d.appendChild(badge);
+      }
       
       d.onmouseenter = () => {
         DefenseTelemetry.track("seat_hover", { seatId: z.id, dwellMs: 800 });
@@ -199,7 +205,9 @@
     }
 
     if (!data.data?.addToCart?.success) {
-      showMsg("ที่นั่งถูกล็อกโดยคนอื่นแล้ว", "error");
+      const errorCode = data.data?.addToCart?.errorCode;
+      showMsg(errorCode === "EVENT_PAUSED" ? "อีเวนต์หยุดขายชั่วคราว" :
+        errorCode === "EVENT_SOLD_OUT" ? "บัตรหมดแล้ว" : "ที่นั่งถูกล็อกโดยคนอื่นแล้ว", "error");
       loadSeats();
       return;
     }

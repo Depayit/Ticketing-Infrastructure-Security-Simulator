@@ -12,7 +12,8 @@ const nextPath = params.get("next");
 const next = ["/", "/member-code", "/seats", "/checkout"].includes(nextPath) ? nextPath : "/";
 let eventId = "demo-concert-2026";
 async function loadChallenge() {
-  const configResponse = await fetch("/api/event-config");
+  const chosenEvent = sessionStorage.getItem("defense_active_event_id") || "demo-concert-2026";
+  const configResponse = await fetch("/api/event-config?event_id=" + encodeURIComponent(chosenEvent));
   if (configResponse.ok) eventId = (await configResponse.json()).eventId || eventId;
   const response = await fetch(`/api/captcha/challenge?position=${encodeURIComponent(position)}&event_id=${encodeURIComponent(eventId)}`, {credentials:"include"});
   const data = await response.json();
