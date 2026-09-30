@@ -3,92 +3,39 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ThaiTicket Major — Seat Selection</title>
+  <title>Defense Live — เลือกโซนที่นั่ง</title>
   <link rel="stylesheet" href="/static/ticket.css" />
+  <link rel="stylesheet" href="/static/site.css" />
   <script src="/static/telemetry.js"></script>
   <script src="/static/funnel-guard.js"></script>
   <script src="/static/ticket-ui.js"></script>
 </head>
-<body>
+<body class="storefront-page seat-page">
+  <div class="utility-bar"><span>DEFENSE LIVE / LIVE EVENTS</span><span>เว็บไซต์จำลองสำหรับการทดสอบระบบ</span></div>
   <header class="Ticket-header">
-    <div class="ticket-logo">
-      <div class="ticket-logo-main">
-        <span class="ticket-logo-badge">Ticket</span>
-        <span>THAITICKET MAJOR</span>
-      </div>
-      <span class="ticket-logo-sub">a ticketmaster company</span>
-    </div>
+    <a class="ticket-logo" href="/" aria-label="Defense Live หน้าแรก"><div class="ticket-logo-main"><span class="ticket-logo-badge">D</span><span>DEFENSE LIVE</span></div><span class="ticket-logo-sub">TICKETING SIMULATOR</span></a>
+    <nav class="header-nav" aria-label="เมนูหลัก"><span class="nav-current">คอนเสิร์ต</span><span>วิธีซื้อบัตร</span><span class="header-help">ศูนย์ช่วยเหลือ</span></nav>
+    <span class="header-sim-label">SIMULATION</span>
   </header>
-
-  <main class="Ticket-main Ticket-main-left" style="max-width: 1100px;">
-    <div class="nav-links">
-      <a href="/">← ห้องรอ</a>
-      <a href="/admin">Defense Admin</a>
-    </div>
-
-    <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 20px;">
-      <div>
-        <h1 class="Ticket-event-title" id="event-name" style="margin-bottom: 8px;"></h1>
-        <p class="Ticket-copy" style="margin: 0;">สนามกีฬาแห่งชาติราชมงคล</p>
-      </div>
-      <p id="purchase-timer" class="purchase-timer" style="font-size: 1.2rem; background: #fff3cd; padding: 6px 12px; border-radius: 6px;"></p>
-    </div>
-
-    <div id="defense-msg" class="alert-banner hidden"></div>
-
-    <div style="display: flex; gap: 30px; align-items: flex-start; flex-wrap: wrap;">
-      
-      <!-- Left side: Fake Seat Map -->
-      <div style="flex: 1; min-width: 300px; background: #000; padding: 10px; border-radius: 12px; display: flex; align-items: center; justify-content: center; position: relative;">
-        <!-- Seat Map Image -->
-        <img src="/static/seat-map-image.png" alt="BTS World Tour Arirang - Seat Map" style="width: 100%; max-width: 700px; height: auto; border-radius: 8px; display: block;" />
-      </div>
-
-      <!-- Right side: Zone Selection -->
-      <div style="width: 380px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);">
-        <!-- Show Date Selector -->
-        <h3 style="margin-top: 0; font-size: 1.1rem; border-bottom: 1px solid #e5e7eb; padding-bottom: 12px; margin-bottom: 16px;">📅 เลือกรอบการแสดง</h3>
-        <div id="show-date-selector" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px;">
-          <label class="show-date-option" style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 2px solid #e5e7eb; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; background: #fff;">
-            <input type="radio" name="show-date" value="2569-12-03" style="accent-color: #2563eb; width: 18px; height: 18px; cursor: pointer;" />
-            <div>
-              <div style="font-weight: 600; font-size: 0.95rem; color: #1e293b;">วันพฤหัสบดีที่ 3 ธันวาคม 2569</div>
-              <div style="font-size: 0.78rem; color: #64748b;">รอบที่ 1</div>
-            </div>
-          </label>
-          <label class="show-date-option" style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 2px solid #e5e7eb; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; background: #fff;">
-            <input type="radio" name="show-date" value="2569-12-05" style="accent-color: #2563eb; width: 18px; height: 18px; cursor: pointer;" />
-            <div>
-              <div style="font-weight: 600; font-size: 0.95rem; color: #1e293b;">วันเสาร์ที่ 5 ธันวาคม 2569</div>
-              <div style="font-size: 0.78rem; color: #64748b;">รอบที่ 2</div>
-            </div>
-          </label>
-          <label class="show-date-option" style="display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 2px solid #e5e7eb; border-radius: 8px; cursor: pointer; transition: all 0.2s ease; background: #fff;">
-            <input type="radio" name="show-date" value="2569-12-06" style="accent-color: #2563eb; width: 18px; height: 18px; cursor: pointer;" />
-            <div>
-              <div style="font-weight: 600; font-size: 0.95rem; color: #1e293b;">วันอาทิตย์ที่ 6 ธันวาคม 2569</div>
-              <div style="font-size: 0.78rem; color: #64748b;">รอบที่ 3</div>
-            </div>
-          </label>
+  <section class="page-banner"><div class="page-banner-inner"><span class="hero-eyebrow">SEAT SELECTION</span><h1 id="event-name"></h1><p>สนามกีฬาแห่งชาติราชมงคล · กรุงเทพฯ</p></div></section>
+  <main class="seat-shell">
+    <div class="purchase-steps" aria-label="ขั้นตอนการซื้อ"><span>01 <b>ห้องรอ</b></span><span class="is-active">02 <b>เลือกที่นั่ง</b></span><span>03 <b>ชำระเงิน</b></span></div>
+    <div class="seat-toolbar"><div><span class="section-kicker">FIND YOUR PLACE</span><h2>เลือกโซนที่ต้องการ</h2><p>เลือกวันแสดง จากนั้นเลือกโซนและจำนวนบัตร</p></div><p id="purchase-timer" class="purchase-timer" aria-live="polite"></p></div>
+    <div id="defense-msg" class="alert-banner hidden" role="alert"></div>
+    <div class="seat-layout">
+      <section class="venue-card" aria-labelledby="venue-heading"><div class="venue-card-header"><div><span class="section-kicker">VENUE OVERVIEW</span><h3 id="venue-heading">ผังโซนที่นั่ง</h3></div><span class="venue-note">ภาพผังจำลอง</span></div><img src="/static/venue-map.svg" alt="ผังสนามจำลอง แสดงตำแหน่งเวทีและโซน VIP, RED, BLUE, YELLOW, GREEN และ TEAL" /><p class="venue-caption">สีของโซนในผังใช้เพื่อการอ้างอิงเท่านั้น เลือกโซนจริงจากรายการด้านขวา</p></section>
+      <section class="zone-card" aria-labelledby="zone-heading"><span class="section-kicker">YOUR TICKETS</span><h3 id="zone-heading">รอบการแสดง</h3>
+        <div id="show-date-selector" class="show-date-selector">
+          <label class="show-date-option"><input type="radio" name="show-date" value="2569-12-03" /><span><strong>พฤหัสบดี 3 ธันวาคม 2569</strong><small>รอบที่ 1</small></span></label>
+          <label class="show-date-option"><input type="radio" name="show-date" value="2569-12-05" /><span><strong>เสาร์ 5 ธันวาคม 2569</strong><small>รอบที่ 2</small></span></label>
+          <label class="show-date-option"><input type="radio" name="show-date" value="2569-12-06" /><span><strong>อาทิตย์ 6 ธันวาคม 2569</strong><small>รอบที่ 3</small></span></label>
         </div>
-
-        <h3 style="margin-top: 0; font-size: 1.1rem; border-bottom: 1px solid #e5e7eb; padding-bottom: 12px; margin-bottom: 20px;">เลือกโซนและราคา (Pricing)</h3>
-        <div class="seats-grid" id="seats" style="grid-template-columns: 1fr; gap: 10px; margin: 0;"></div>
-        
-        <div id="quantity-section" style="display: none; margin: 24px 0; background: #fff; padding: 16px; border: 1px solid #e5e7eb; border-radius: 8px;">
-          <label for="ticket-quantity" style="font-weight: 600; display: block; margin-bottom: 8px;">จำนวนบัตร (สูงสุด 4 ใบ):</label>
-          <select id="ticket-quantity" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 16px;">
-            <option value="1">1</option>
-          </select>
-        </div>
-
-        <p id="status-msg" class="Ticket-copy" style="font-weight: 600; color: #b91c1c; margin-top: 16px;"></p>
-        <button id="btn-checkout" class="ticket-btn" style="width: 100%; padding: 14px; font-size: 1.1rem; margin-top: 10px;" disabled>ยืนยันและไปชำระเงิน</button>
-      </div>
-
+        <h3 class="zone-list-heading">โซนและราคา</h3><div class="seats-grid" id="seats"></div>
+        <div id="quantity-section" class="quantity-section" style="display:none"><label for="ticket-quantity">จำนวนบัตร <small>(สูงสุด 4 ใบ)</small></label><select id="ticket-quantity"><option value="1">1</option></select></div>
+        <p id="status-msg" class="zone-status" aria-live="polite"></p><button id="btn-checkout" class="ticket-btn zone-next" disabled>ยืนยันและไปชำระเงิน <span aria-hidden="true">→</span></button>
+      </section>
     </div>
   </main>
-
   <footer class="Ticket-footer"></footer>
   <script src="/static/seat-map.js"></script>
 </body>

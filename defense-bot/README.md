@@ -6,6 +6,8 @@ See [WORKFLOW.md](WORKFLOW.md), [ARCHITECTURE.md](ARCHITECTURE.md), and [GLOSSAR
 
 The admin Event Config dialog switches Workflow Profiles A–D at runtime. Profiles A/B/D enforce mock Login Gates and C/D enable server checked form CAPTCHA. Login accepts any nonempty password for a valid email and creates a separate Auth Session; it is a lab identity only.
 
+The buyer UI uses the fictional Defense Live brand and one real crowd photograph across the waiting room, member check, seat selection, and checkout. Event-specific poster artwork has been removed. The seating diagram is illustrative. See [frontend/ASSETS.md](frontend/ASSETS.md) for the photo source and license. The checkout remains a simulation and does not take real payments.
+
 ## Quick Start (Docker)
 
 ```bash
@@ -25,7 +27,7 @@ For a Linux server installation that can be controlled over SSH from another dev
 | http://localhost:8090/login | Mock Login Gate | Auth Session |
 | http://localhost:8090/captcha | Form CAPTCHA | Server checked challenge |
 
-**Event:** BTS WORLD TOUR 'ARIRANG' IN BANGKOK (`demo-concert-2026`)
+**Event:** BANGKOK LIVE EXPERIENCE 2026 (`demo-concert-2026`)
 
 ## Defense Stack (สเปกจำลอง Ticket)
 

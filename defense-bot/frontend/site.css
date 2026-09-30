@@ -1,0 +1,200 @@
+/* Shared storefront design. The brand and venue artwork are fictional lab assets. */
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
+
+:root {
+  --Ticket-red: #d05b45;
+  --Ticket-blue: #c65440;
+  --Ticket-blue-hover: #a93f30;
+  --text-primary: #192536;
+  --text-secondary: #566477;
+  --text-muted: #728093;
+  --border-light: #e4e9ef;
+  --progress-track: #e9edf2;
+  --progress-start: #ecb37d;
+  --progress-end: #c65440;
+  --success: #15956d;
+  --danger: #d24f52;
+  --surface: #fff;
+  --canvas: #f2f4f7;
+}
+
+html, body { font-family: 'IBM Plex Sans Thai', 'Manrope', system-ui, sans-serif; }
+body { background: var(--canvas); }
+body.storefront-page { min-height: 100vh; display: flex; flex-direction: column; }
+button, input, select, textarea { font: inherit; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 3px solid #f3ab76; outline-offset: 2px; }
+
+.utility-bar { min-height: 30px; background: #101b2a; color: #b8c2cd; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 5px max(24px, calc((100vw - 1180px) / 2)); font: 700 10px/1.4 'Manrope', sans-serif; letter-spacing: .12em; }
+.utility-bar span:last-child { font-family: 'IBM Plex Sans Thai', sans-serif; font-weight: 500; letter-spacing: .02em; }
+.Ticket-header { min-height: 78px; padding: 12px max(24px, calc((100vw - 1180px) / 2)); display: flex; align-items: center; justify-content: space-between; gap: 24px; text-align: left; background: #fff; border-bottom: 1px solid #e9edf1; box-shadow: 0 3px 18px rgba(14, 32, 53, .04); position: relative; z-index: 3; }
+.ticket-logo { display: inline-flex; align-items: flex-start; gap: 3px; color: inherit; text-decoration: none; flex-shrink: 0; }
+.ticket-logo-main { gap: 9px; color: #192536; font: 800 1.27rem/1 'Manrope', sans-serif; letter-spacing: -.035em; }
+.ticket-logo-badge { display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0; background: #c65440; border-radius: 7px; font: 800 1.1rem 'Manrope', sans-serif; letter-spacing: 0; }
+.ticket-logo-sub { margin-left: 39px; color: #778494; font: 700 8px/1 'Manrope', sans-serif; letter-spacing: .14em; }
+.header-nav { display: flex; align-items: center; gap: clamp(18px, 3vw, 42px); margin-left: auto; color: #5b6675; font-size: .86rem; font-weight: 600; white-space: nowrap; }
+.header-nav .nav-current { color: #b54b38; }
+.header-sim-label { border: 1px solid #ead8cf; border-radius: 5px; color: #a44c3d; background: #fff8f4; padding: 6px 9px; font: 800 10px 'Manrope', sans-serif; letter-spacing: .09em; white-space: nowrap; }
+
+.event-hero, .page-banner { background: linear-gradient(90deg, rgba(9,20,35,.92), rgba(9,20,35,.55) 58%, rgba(9,20,35,.16)), url('/static/concert-crowd.jpg') center 43% / cover no-repeat; color: #fff; }
+.event-hero { min-height: 338px; display: flex; align-items: center; }
+.event-hero-content, .page-banner-inner { width: min(1180px, calc(100% - 48px)); margin: 0 auto; }
+.hero-eyebrow, .section-kicker { display: block; color: #e6b681; font: 800 10px/1.5 'Manrope', sans-serif; letter-spacing: .18em; }
+.event-hero h1 { margin: 12px 0 8px; max-width: 680px; color: #fff; font-size: clamp(1.75rem, 3.2vw, 3.15rem); line-height: 1.2; font-weight: 700; letter-spacing: -.035em; text-transform: uppercase; }
+.event-hero p { margin: 0; color: #e4e9ed; font-size: .97rem; }
+.hero-meta { display: flex; gap: 20px; flex-wrap: wrap; margin-top: 26px; color: #e2e9ee; font-size: .79rem; }
+.page-banner { min-height: 182px; display: flex; align-items: center; }
+.page-banner h1 { max-width: 850px; margin: 8px 0 4px; color: #fff; font-size: clamp(1.25rem, 2vw, 1.75rem); line-height: 1.25; }
+.page-banner p { margin: 0; color: #d9e1e8; font-size: .9rem; }
+
+.Ticket-main { width: min(880px, calc(100% - 32px)); max-width: none; min-height: 330px; margin: -42px auto 60px; padding: 0 48px 48px; background: #fff; border: 1px solid #e6eaf0; border-radius: 12px; box-shadow: 0 22px 50px rgba(16, 35, 55, .13); position: relative; z-index: 2; }
+.purchase-steps { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 19px 0; margin: 0 0 35px; border-bottom: 1px solid #e9edf1; color: #96a1ac; font: 700 .77rem 'Manrope', 'IBM Plex Sans Thai', sans-serif; }
+.purchase-steps span { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.purchase-steps span b { font-weight: 600; }
+.purchase-steps .is-active { color: #bd4d3b; }
+.purchase-steps .is-active::before { content: ''; width: 7px; height: 7px; background: #d05b45; border-radius: 50%; }
+.Ticket-event-title, .queue-heading { color: #1a293b; line-height: 1.3; letter-spacing: -.02em; }
+.Ticket-event-title { font-size: clamp(1.2rem, 2vw, 1.55rem); }
+.queue-heading { font-size: clamp(1.45rem, 2.6vw, 2rem); }
+.Ticket-copy, .queue-subheading { color: #5b6878; }
+.countdown-display { display: inline-block; padding: 18px 28px; border-radius: 10px; background: #fdf7f2; border: 1px solid #f5e2d4; color: #af513f; font: 800 clamp(2rem, 5vw, 3.25rem) 'Manrope', sans-serif; letter-spacing: -.035em; }
+.ticket-btn, .submit-btn, .btn-confirm-order { border-radius: 7px; background: #c65440; box-shadow: none; font-weight: 700; }
+.ticket-btn:hover:not(:disabled), .submit-btn:hover, .btn-confirm-order:hover:not(:disabled) { background: #a93f30; box-shadow: 0 8px 22px rgba(169,63,48,.18); }
+.login-card, .panel-card { border-radius: 10px; background: #fbfcfd; box-shadow: none; }
+.form-group input, .form-group select { border-radius: 7px; border-color: #d5dde5; }
+.recaptcha-widget { border-radius: 8px; }
+.verification-icon { display: inline-grid; place-items: center; width: 27px; height: 27px; margin: 0 auto 3px; border-radius: 50%; color: #fff; background: #1f9b75; font-size: 18px; }
+.recaptcha-logo { display: none; }
+.entry-overlay { background: linear-gradient(rgba(7,18,31,.72), rgba(7,18,31,.75)), url('/static/concert-crowd.jpg') center / cover; }
+.entry-modal, .activity-modal, .captcha-modal { border-radius: 12px; }
+.progress-track { height: 11px; }
+.progress-user-icon { background: #c65440; }
+.waiting-page #bot-score-label { display: none !important; }
+.Ticket-footer { position: static; margin-top: auto; padding: 19px max(24px, calc((100vw - 1180px) / 2)); border-top: 1px solid #e3e8ee; background: #fff; box-shadow: none; color: #667486; font-size: .76rem; }
+.footer-brand { color: #1f2d40; font: 800 .85rem 'Manrope', sans-serif; letter-spacing: -.02em; }
+.footer-note { max-width: 580px; }
+.footer-queue { font: 600 .72rem 'Manrope', sans-serif; color: #8a97a5; }
+
+/* Seat selection */
+.seat-shell { width: min(1180px, calc(100% - 32px)); margin: -35px auto 55px; padding: 0 28px 30px; background: #fff; border: 1px solid #e5eaf0; border-radius: 12px; box-shadow: 0 20px 48px rgba(16,35,55,.12); position: relative; z-index: 2; }
+.seat-shell .purchase-steps { margin-bottom: 25px; }
+.seat-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 24px; }
+.seat-toolbar h2 { margin: 4px 0 2px; font-size: 1.42rem; letter-spacing: -.02em; }
+.seat-toolbar p { margin: 0; color: #778494; font-size: .85rem; }
+.seat-toolbar .purchase-timer { padding: 9px 15px; border: 1px solid #f0dcca; border-radius: 7px; background: #fff8f0; color: #a55330; font-weight: 700; white-space: nowrap; }
+.seat-toolbar .purchase-timer:empty { display: none; }
+.seat-layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(310px, .85fr); gap: 24px; align-items: start; }
+.venue-card, .zone-card { min-width: 0; background: #fff; border: 1px solid #e3e8ee; border-radius: 10px; overflow: hidden; }
+.venue-card-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 18px 20px; border-bottom: 1px solid #e9edf1; }
+.venue-card-header h3, .zone-card h3 { margin: 3px 0 0; font-size: 1.1rem; color: #1b2837; }
+.venue-note { padding: 5px 8px; border: 1px solid #e5e9ed; border-radius: 4px; color: #7b8795; font-size: .7rem; }
+.venue-card img { display: block; width: 100%; height: auto; background: #0e1e33; }
+.venue-caption { margin: 0; padding: 14px 20px; color: #768394; font-size: .76rem; line-height: 1.5; }
+.zone-card { padding: 20px; }
+.show-date-selector { display: grid; gap: 9px; margin: 16px 0 24px; }
+.show-date-option { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border: 1px solid #dfe5eb; border-radius: 7px; background: #fff; cursor: pointer; }
+.show-date-option input { width: 17px; height: 17px; accent-color: #c65440; flex-shrink: 0; }
+.show-date-option strong, .show-date-option small { display: block; }
+.show-date-option strong { color: #263446; font-size: .82rem; }
+.show-date-option small { margin-top: 1px; color: #7c8998; font-size: .72rem; }
+.show-date-option:hover, .show-date-option:has(input:checked) { border-color: #dca994 !important; background: #fff9f6 !important; box-shadow: none !important; }
+.zone-list-heading { padding-top: 19px; border-top: 1px solid #e9edf1; }
+.zone-card .seats-grid { display: grid; grid-template-columns: 1fr; gap: 8px; margin: 14px 0 0; }
+.zone-card .seat { position: relative; width: 100%; min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 13px 11px 23px; border: 1px solid #e0e6ec !important; border-radius: 7px; background: #fff !important; color: #243244 !important; text-shadow: none !important; text-align: left; cursor: pointer; box-shadow: none; }
+.zone-card .seat::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; border-radius: 6px 0 0 6px; background: var(--zone-color, #c65440); }
+.zone-card .seat:hover { border-color: #c4d0da !important; transform: translateY(-1px); background: #fbfcfd !important; }
+.zone-card .seat.selected { border-color: #c65440 !important; box-shadow: 0 0 0 2px rgba(198,84,64,.12); background: #fff8f4 !important; }
+.zone-card .seat.held, .zone-card .seat.sold { opacity: .48; cursor: not-allowed; }
+.zone-card .seat-label, .zone-card .seat-status { margin: 0 !important; color: #253144; font-size: .85rem !important; font-weight: 700; }
+.zone-card .seat-status { white-space: nowrap; }
+.zone-card .seat .restricted-view { display: block; margin-top: 2px; color: #8a6872; font-size: .66rem; font-weight: 500; }
+.quantity-section { margin: 22px 0 0; padding: 15px; border: 1px solid #e3e8ee; border-radius: 7px; background: #f8fafb; }
+.quantity-section label { display: block; margin-bottom: 7px; font-weight: 700; font-size: .8rem; }
+.quantity-section small { color: #84909e; font-weight: 400; }
+.quantity-section select { width: 100%; padding: 9px 10px; border: 1px solid #d7e0e8; border-radius: 6px; background: #fff; }
+.zone-status { min-height: 20px; margin: 14px 0 8px; color: #b4473c; font-size: .78rem; font-weight: 600; }
+.zone-next { width: 100%; min-height: 47px; justify-content: center; gap: 8px; }
+
+/* Checkout */
+.checkout-page .checkout-stepper { background: #fff; border-bottom: 1px solid #e7ecf0; }
+.checkout-page .checkout-banner { min-height: 148px; }
+.checkout-page #panel-pay.checkout-body { width: min(1120px, calc(100% - 32px)); max-width: none; display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 0 22px; align-items: start; margin: 26px auto 130px; padding: 0; }
+.checkout-page #panel-pay .order-summary-card { grid-column: 2; grid-row: 1 / span 8; position: sticky; top: 20px; margin: 0; border-radius: 9px; box-shadow: 0 7px 26px rgba(19,40,58,.07); }
+.checkout-page #panel-pay .checkout-section { grid-column: 1; margin: 0 0 18px; padding: 23px 25px; background: #fff; border: 1px solid #e4e9ef; border-radius: 9px; box-shadow: 0 5px 18px rgba(19,40,58,.04); }
+.checkout-page #panel-pay .checkout-section.refund-policy { background: #f9fafb; color: #697789; }
+.checkout-page .section-title { border-bottom: 1px solid #e6eaf0; padding-bottom: 13px; font-size: 1rem; }
+.checkout-page .order-badge { background: #fff4ec; color: #ae593b; }
+.checkout-page .timer-bar { background: #fff9ef; border-color: #f4e8d8; color: #9b5e2d; }
+.checkout-page .timer-bar:has(#purchase-timer:empty) { display: none; }
+.checkout-page .sticky-bottom-bar { z-index: 5; border-top: 1px solid #e4e9ef; box-shadow: 0 -8px 25px rgba(18,39,58,.08); }
+.checkout-page .checkout-body:not(#panel-pay) { margin-top: 30px; }
+
+/* Login, challenge and member code */
+.auth-page .auth-shell { display: grid; grid-template-columns: minmax(0, 1fr) minmax(380px, .9fr); width: min(1040px, calc(100% - 32px)); min-height: 520px; margin: 55px auto 70px; overflow: hidden; border: 1px solid #e3e8ee; border-radius: 12px; background: #fff; box-shadow: 0 22px 45px rgba(20,39,56,.1); }
+.auth-page .auth-photo { display: flex; flex-direction: column; justify-content: flex-end; min-height: 360px; padding: 34px; background: linear-gradient(0deg, rgba(7,17,30,.84), rgba(7,17,30,.1) 70%), url('/static/concert-crowd.jpg') center / cover; color: #fff; }
+.auth-photo h2 { margin: 10px 0 6px; max-width: 360px; color: #fff; font-size: clamp(1.7rem, 3vw, 2.45rem); line-height: 1.2; }
+.auth-photo p { margin: 0; max-width: 350px; color: #e3eaf1; font-size: .83rem; }
+.auth-page .auth-form-panel { display: flex; flex-direction: column; justify-content: center; padding: 48px; }
+.auth-form-panel h1 { margin: 0 0 6px; font-size: 1.55rem; }
+.auth-form-panel p { color: #667486; }
+.auth-form-panel label { display: block; margin: 18px 0; color: #435164; font-size: .84rem; font-weight: 700; }
+.auth-form-panel input { display: block; width: 100%; margin-top: 7px; padding: 11px 13px; border: 1px solid #d5dde5; border-radius: 7px; background: #fff; color: #243244; }
+.auth-form-panel .ticket-btn { width: 100%; margin-top: 4px; }
+.auth-form-panel #error { color: #bd3f42; min-height: 20px; }
+.auth-form-panel #question { margin: 8px 0 5px; padding: 15px; border: 1px solid #e5eaf0; border-radius: 7px; background: #f8fafb; color: #1d2c40; font-weight: 700; }
+.member-page .main-container { flex: 1; display: flex; align-items: center; justify-content: center; background: var(--canvas); padding: 44px 20px 65px; }
+.member-page .split-card { display: flex; width: 100%; max-width: 1060px; gap: 0; padding: 0; overflow: hidden; background: #fff; border: 1px solid #e3e8ee; border-radius: 12px; box-shadow: 0 22px 45px rgba(20,39,56,.1); }
+.member-page .member-photo { flex: 1; align-self: stretch; min-height: 420px; display: flex; flex-direction: column; justify-content: flex-end; padding: 34px; color: #fff; background: linear-gradient(0deg, rgba(7,17,30,.84), rgba(7,17,30,.05) 75%), url('/static/concert-crowd.jpg') center / cover; }
+.member-page .member-photo h2 { margin: 8px 0 5px; max-width: 320px; color: #fff; font-size: clamp(1.6rem, 2.6vw, 2.25rem); line-height: 1.2; }
+.member-page .member-photo p { margin: 0; color: #e3eaf1; font-size: .82rem; }
+.member-page .form-section { flex: 1; padding: 45px; display: flex; flex-direction: column; justify-content: center; }
+.member-page .form-title { margin: 0 0 22px; color: #192536; font-size: 1.5rem; }
+.member-page .input-wrapper { margin-bottom: 18px; }
+.member-page .code-input { width: 100%; padding: 14px 16px; border: 1px solid #d5dde5; border-radius: 7px; background: #fff; color: #243244; font-size: 1rem; }
+.member-page .submit-btn { width: 100%; padding: 13px 16px; border: 0; border-radius: 7px; background: #c65440; color: #fff; font-weight: 700; cursor: pointer; box-shadow: none; }
+.member-page .submit-btn:hover { background: #a93f30; box-shadow: 0 8px 22px rgba(169,63,48,.18); }
+.member-page .error-msg { display: none; margin-top: 15px; padding: 10px 12px; border: 1px solid #f2c5c8; border-radius: 6px; background: #fff7f7; color: #b74248; font-size: .85rem; }
+
+/* Admin */
+.admin-page .admin-wrap { width: min(1280px, calc(100% - 32px)); max-width: none; padding: 30px 0 70px; }
+.admin-page .ticket-logo-main small { margin-left: 4px; color: #9b6956; font-size: .58rem; letter-spacing: .12em; vertical-align: middle; }
+.admin-page .stat-card { background: #fff; border-radius: 9px; box-shadow: 0 4px 16px rgba(20,40,58,.04); }
+.admin-page .admin-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-page .admin-actions button, .admin-page .filter-tabs button { border-radius: 6px; }
+.admin-page .table-wrap { background: #fff; border: 1px solid #e3e8ee; border-radius: 9px; box-shadow: 0 5px 18px rgba(20,40,58,.04); }
+
+@media (max-width: 900px) {
+  .header-nav { display: none; }
+  .seat-layout { grid-template-columns: 1fr; }
+  .checkout-page #panel-pay.checkout-body { grid-template-columns: 1fr; }
+  .checkout-page #panel-pay .order-summary-card { grid-column: 1; grid-row: auto; position: static; margin-bottom: 18px; }
+  .checkout-page #panel-pay .checkout-section { grid-column: 1; }
+}
+@media (max-width: 680px) {
+  .utility-bar { padding: 5px 15px; }
+  .utility-bar span:last-child { display: none; }
+  .Ticket-header { min-height: 68px; padding: 10px 16px; }
+  .ticket-logo-main { font-size: 1rem; }
+  .ticket-logo-sub { margin-left: 39px; font-size: 7px; }
+  .header-sim-label { font-size: 8px; }
+  .admin-page .ticket-logo-main small { display: none; }
+  .event-hero { min-height: 275px; align-items: flex-start; padding: 46px 0 75px; }
+  .event-hero-content, .page-banner-inner { width: calc(100% - 32px); }
+  .event-hero h1 { font-size: 1.75rem; }
+  .hero-meta { gap: 8px; font-size: .7rem; }
+  .Ticket-main { margin-top: -45px; padding: 0 18px 30px; }
+  .purchase-steps { gap: 6px; font-size: .66rem; }
+  .purchase-steps span { gap: 3px; }
+  .purchase-steps .is-active::before { width: 5px; height: 5px; }
+  .seat-shell { padding: 0 16px 18px; }
+  .seat-page .zone-card { order: -1; }
+  .seat-toolbar { align-items: flex-start; flex-direction: column; }
+  .zone-card { padding: 16px; }
+  .checkout-page #panel-pay .checkout-section { padding: 18px 15px; }
+  .auth-page .auth-shell { grid-template-columns: 1fr; margin-top: 24px; }
+  .auth-page .auth-photo { min-height: 210px; padding: 24px; }
+  .auth-page .auth-form-panel { padding: 28px 22px; }
+  .member-page .split-card { flex-direction: column; }
+  .member-page .member-photo { width: 100%; min-height: 250px; }
+  .member-page .form-section { width: 100%; padding: 30px 22px; }
+  .Ticket-footer { padding: 18px 16px; }
+}

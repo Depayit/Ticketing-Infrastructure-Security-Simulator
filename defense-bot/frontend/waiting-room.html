@@ -3,25 +3,39 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ThaiTicket Major — Waiting Room</title>
+  <title>Defense Live — ห้องรอซื้อบัตร</title>
   <link rel="stylesheet" href="/static/ticket.css" />
+  <link rel="stylesheet" href="/static/site.css" />
   <script src="/static/event-config.js"></script>
   <script src="/static/akamai-sensor.js"></script>
   <script src="/static/telemetry.js"></script>
   <script src="/static/ticket-ui.js"></script>
 </head>
-<body>
+<body class="storefront-page waiting-page">
+  <div class="utility-bar"><span>DEFENSE LIVE / LIVE EVENTS</span><span>เว็บไซต์จำลองสำหรับการทดสอบระบบ</span></div>
   <header class="Ticket-header">
-    <div class="ticket-logo">
+    <a class="ticket-logo" href="/" aria-label="Defense Live หน้าแรก">
       <div class="ticket-logo-main">
-        <span class="ticket-logo-badge">Ticket</span>
-        <span>THAITICKET MAJOR</span>
+        <span class="ticket-logo-badge">D</span>
+        <span>DEFENSE LIVE</span>
       </div>
-      <span class="ticket-logo-sub">a ticketmaster company</span>
-    </div>
+      <span class="ticket-logo-sub">TICKETING SIMULATOR</span>
+    </a>
+    <nav class="header-nav" aria-label="เมนูหลัก"><span class="nav-current">คอนเสิร์ต</span><span>วิธีซื้อบัตร</span><span class="header-help">ศูนย์ช่วยเหลือ</span></nav>
+    <span class="header-sim-label">SIMULATION</span>
   </header>
 
+  <section class="event-hero" aria-label="บรรยากาศคอนเสิร์ต">
+    <div class="event-hero-content">
+      <span class="hero-eyebrow">THE LIVE EXPERIENCE / BANGKOK</span>
+      <h1 class="event-title">LIVE EVENT</h1>
+      <p>เตรียมตัวให้พร้อมสำหรับช่วงเวลาที่คุณรอคอย</p>
+      <div class="hero-meta"><span>◉ การจำหน่ายบัตรออนไลน์</span><span>● ห้องรอเปิดตามกำหนด</span></div>
+    </div>
+  </section>
+
   <main class="Ticket-main">
+    <div class="purchase-steps" aria-label="ขั้นตอนการซื้อ"><span class="is-active">01 <b>ห้องรอ</b></span><span>02 <b>เลือกที่นั่ง</b></span><span>03 <b>ชำระเงิน</b></span></div>
     <span id="demo-badge" class="demo-badge hidden">Demo Mode — ?demo=1</span>
 
     <section id="phase-too-early" class="hidden">
@@ -35,7 +49,7 @@
       <p class="Ticket-copy" id="pre-login-note"></p>
       <div class="login-card">
         <h2>เข้าสู่ระบบสมาชิก</h2>
-        <p>ล็อกอินก่อนเวลาเปิดขายเพื่อเข้าห้องรอ (Defense Layer 1 ตรวจ IP ที่ Gateway)</p>
+        <p>เข้าสู่ระบบก่อนเริ่มจำหน่าย เพื่อให้คุณเข้าคิวได้เมื่อห้องรอเปิด</p>
         <form id="login-form">
           <div class="form-group">
             <label for="login-email">อีเมล</label>
@@ -48,15 +62,11 @@
           <div class="recaptcha-widget">
             <div class="recaptcha-checkbox-container">
               <input type="checkbox" id="login-captcha" required />
-              <label for="login-captcha">ฉันไม่ใช่โปรแกรมอัตโนมัติ (CAPTCHA)</label>
+              <label for="login-captcha">ยืนยันว่าฉันเป็นผู้ใช้งานจริง</label>
             </div>
             <div class="recaptcha-logo-container">
-              <img src="https://www.gstatic.com/recaptcha/api2/logo_48.png" alt="reCAPTCHA" class="recaptcha-logo" />
-              <span class="recaptcha-text">reCAPTCHA</span>
-              <div class="recaptcha-links">
-                <a href="https://policies.google.com/privacy" target="_blank">Privacy</a> - 
-                <a href="https://policies.google.com/terms" target="_blank">Terms</a>
-              </div>
+              <span class="verification-icon" aria-hidden="true">✓</span>
+              <span class="recaptcha-text">SECURE ENTRY</span>
             </div>
           </div>
           <button type="submit" class="ticket-btn">เข้าสู่ระบบ</button>
@@ -103,9 +113,7 @@
 
     <section id="phase-admitted" class="hidden">
       <h1 class="queue-heading">ผ่านคิวแล้ว!</h1>
-      <p class="queue-subheading">
-        Queue Service ออก token แล้ว — คุณมีเวลา 10 นาทีในการเลือกที่นั่งและชำระเงิน
-      </p>
+      <p class="queue-subheading">ถึงคิวของคุณแล้ว กรุณาเลือกที่นั่งและชำระเงินภายใน 10 นาที</p>
       <p class="event-title Ticket-event-title" style="font-size:1rem;"></p>
       <button id="btn-enter-seats" class="ticket-btn">เลือกที่นั่ง</button>
     </section>
@@ -123,10 +131,9 @@
 
   <div id="akamai-challenge-modal" class="modal-backdrop hidden">
     <div class="activity-modal">
-      <h2>Akamai Bot Manager — Challenge</h2>
-      <p>Bot Score สูง — ต้องยืนยันความเป็นมนุษย์ก่อนเข้าคิว priority</p>
-      <p class="Ticket-copy">สถานะคุกกี้ <code>_abck</code>: challenged (-1)</p>
-      <button id="btn-akamai-challenge" class="ticket-btn">Complete Challenge</button>
+      <h2>ตรวจสอบการเข้าคิว</h2>
+      <p>โปรดยืนยันอีกครั้งเพื่อดำเนินการต่อ</p>
+      <button id="btn-akamai-challenge" class="ticket-btn">ยืนยันและดำเนินการต่อ</button>
     </div>
   </div>
 

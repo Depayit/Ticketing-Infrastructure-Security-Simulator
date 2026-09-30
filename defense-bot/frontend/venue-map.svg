@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 650" role="img" aria-labelledby="title desc">
+  <title id="title">ผังโซนที่นั่งจำลอง</title>
+  <desc id="desc">เวทีอยู่ด้านบน โซน VIP อยู่ใกล้เวที ถัดมาเป็นโซน RED BLUE YELLOW GREEN และ TEAL</desc>
+  <defs>
+    <linearGradient id="bg" x2="0" y2="1"><stop stop-color="#142642"/><stop offset="1" stop-color="#081426"/></linearGradient>
+    <linearGradient id="stage" x2="0" y2="1"><stop stop-color="#f0caa0"/><stop offset="1" stop-color="#be9062"/></linearGradient>
+    <pattern id="seatDots" width="13" height="13" patternUnits="userSpaceOnUse"><circle cx="6.5" cy="6.5" r="1.15" fill="#fff" opacity=".34"/></pattern>
+    <filter id="shadow"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000" flood-opacity=".3"/></filter>
+  </defs>
+  <rect width="900" height="650" rx="24" fill="url(#bg)"/>
+  <path d="M95 574A347 347 0 0 1 805 574" fill="none" stroke="#73849b" stroke-opacity=".25" stroke-width="3"/>
+  <path d="M135 571A307 307 0 0 1 765 571" fill="none" stroke="#73849b" stroke-opacity=".25" stroke-width="3"/>
+  <path d="M175 569A267 267 0 0 1 725 569" fill="none" stroke="#73849b" stroke-opacity=".25" stroke-width="3"/>
+  <path d="M226 563A216 216 0 0 1 674 563" fill="none" stroke="#73849b" stroke-opacity=".25" stroke-width="3"/>
+  <rect x="304" y="48" width="292" height="74" rx="14" fill="url(#stage)" filter="url(#shadow)"/>
+  <rect x="316" y="60" width="268" height="50" rx="8" fill="#1d2533"/>
+  <text x="450" y="92" fill="#fff" text-anchor="middle" font-family="Arial,sans-serif" font-size="20" font-weight="700" letter-spacing="7">STAGE</text>
+  <path d="M422 123h56l20 105h-96z" fill="#263b53" stroke="#d3ac79" stroke-width="2"/>
+  <path d="M370 150h52l-22 105h-83z" fill="#b7709d" stroke="#dba9ca" stroke-width="2"/>
+  <path d="M478 150h52l53 105h-83z" fill="#b7709d" stroke="#dba9ca" stroke-width="2"/>
+  <path d="M370 150h52l-22 105h-83zM478 150h52l53 105h-83z" fill="url(#seatDots)"/>
+  <rect x="394" y="238" width="112" height="86" rx="10" fill="#a86bce" stroke="#d9b6ec" stroke-width="2"/>
+  <rect x="394" y="238" width="112" height="86" rx="10" fill="url(#seatDots)"/>
+  <text x="450" y="285" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="21" font-weight="700">VIP</text>
+  <path d="M305 273h79v137l-109 25-30-88z" fill="#d45867" stroke="#ff9aa4" stroke-width="2"/>
+  <path d="M595 273h-79v137l109 25 30-88z" fill="#d45867" stroke="#ff9aa4" stroke-width="2"/>
+  <path d="M305 273h79v137l-109 25-30-88zM595 273h-79v137l109 25 30-88z" fill="url(#seatDots)"/>
+  <text x="319" y="359" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="17" font-weight="700">RED</text>
+  <text x="581" y="359" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="17" font-weight="700">RED</text>
+  <path d="M196 354l46-64 26 151 113-24v74l-151 49-61-76z" fill="#4b8dc7" stroke="#86c5eb" stroke-width="2"/>
+  <path d="M704 354l-46-64-26 151-113-24v74l151 49 61-76z" fill="#4b8dc7" stroke="#86c5eb" stroke-width="2"/>
+  <path d="M196 354l46-64 26 151 113-24v74l-151 49-61-76zM704 354l-46-64-26 151-113-24v74l151 49 61-76z" fill="url(#seatDots)"/>
+  <text x="246" y="464" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="16" font-weight="700">BLUE</text>
+  <text x="654" y="464" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="16" font-weight="700">BLUE</text>
+  <path d="M389 340h122v137l-122 17z" fill="#d8a74c" stroke="#f1d18b" stroke-width="2"/>
+  <path d="M389 340h122v137l-122 17z" fill="url(#seatDots)"/>
+  <text x="450" y="422" text-anchor="middle" fill="#17213a" font-family="Arial,sans-serif" font-size="16" font-weight="700">YELLOW</text>
+  <path d="M360 507l89-19 90 19 53 77H308z" fill="#4eaa84" stroke="#8bd6b0" stroke-width="2"/>
+  <path d="M360 507l89-19 90 19 53 77H308z" fill="url(#seatDots)"/>
+  <text x="450" y="556" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="17" font-weight="700">GREEN</text>
+  <path d="M101 464l60-93 66 175 66 47-120 14-88-70z" fill="#46a7ad" stroke="#93dce0" stroke-width="2"/>
+  <path d="M799 464l-60-93-66 175-66 47 120 14 88-70z" fill="#46a7ad" stroke="#93dce0" stroke-width="2"/>
+  <path d="M101 464l60-93 66 175 66 47-120 14-88-70zM799 464l-60-93-66 175-66 47 120 14 88-70z" fill="url(#seatDots)"/>
+  <text x="161" y="534" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="17" font-weight="700">TEAL</text>
+  <text x="739" y="534" text-anchor="middle" fill="#fff" font-family="Arial,sans-serif" font-size="17" font-weight="700">TEAL</text>
+  <text x="450" y="626" text-anchor="middle" fill="#9fb0c5" font-family="Arial,sans-serif" font-size="13" letter-spacing="3">ILLUSTRATIVE VENUE MAP · NOT TO SCALE</text>
+</svg>

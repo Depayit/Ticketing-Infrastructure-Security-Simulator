@@ -1,10 +1,11 @@
 <!doctype html>
 <html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Defense Lab — CAPTCHA</title><link rel="stylesheet" href="/static/ticket.css">
-<style>main{max-width:420px;margin:8vh auto;padding:28px;background:white;border-radius:12px;box-shadow:0 8px 30px #0002}input{display:block;width:100%;padding:10px;margin:16px 0}#error{color:#b91c1c}</style></head>
-<body><main><h1>CAPTCHA จำลอง</h1><p>ด่านนี้แยกจาก Sensor Challenge</p><p id="question">กำลังโหลด...</p>
-<form id="form"><input id="answer" inputmode="numeric" required aria-label="คำตอบ"><button class="ticket-btn" type="submit">ยืนยัน</button></form>
-<p id="error" role="alert"></p></main><script>
+<title>Defense Live — ตรวจสอบความปลอดภัย</title><link rel="stylesheet" href="/static/ticket.css"><link rel="stylesheet" href="/static/site.css"></head>
+<body class="storefront-page auth-page"><div class="utility-bar"><span>DEFENSE LIVE / LIVE EVENTS</span><span>เว็บไซต์จำลองสำหรับการทดสอบระบบ</span></div>
+<header class="Ticket-header"><a class="ticket-logo" href="/" aria-label="Defense Live หน้าแรก"><div class="ticket-logo-main"><span class="ticket-logo-badge">D</span><span>DEFENSE LIVE</span></div><span class="ticket-logo-sub">TICKETING SIMULATOR</span></a><span class="header-sim-label">SIMULATION</span></header>
+<main class="auth-shell"><div class="auth-photo"><span class="hero-eyebrow">SECURE ENTRY</span><h2>ยืนยันก่อนเข้าชม</h2><p>ระบบขอตรวจสอบสั้น ๆ เพื่อให้ทุกคนมีโอกาสซื้อบัตรอย่างเท่าเทียม</p></div><div class="auth-form-panel"><span class="section-kicker">ONE MORE STEP</span><h1>ตรวจสอบความปลอดภัย</h1><p>ตอบคำถามด้านล่างเพื่อดำเนินการต่อ</p><p id="question">กำลังโหลด...</p>
+<form id="form"><label for="answer">คำตอบ<input id="answer" inputmode="numeric" required aria-label="คำตอบ"></label><button class="ticket-btn" type="submit">ยืนยันและดำเนินการต่อ</button></form>
+<p id="error" role="alert"></p></div></main><footer class="Ticket-footer"><span class="footer-brand">DEFENSE LIVE</span><span class="footer-note">ระบบจำลองสำหรับการศึกษาและทดสอบ ไม่มีการขายบัตรจริง</span></footer><script>
 const params = new URLSearchParams(location.search);
 const position = params.get("position") || "queue";
 const nextPath = params.get("next");

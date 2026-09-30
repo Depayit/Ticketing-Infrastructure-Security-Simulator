@@ -1,12 +1,15 @@
 <!doctype html>
 <html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Defense Lab — Login Gate</title><link rel="stylesheet" href="/static/ticket.css">
+<title>Defense Live — เข้าสู่ระบบ</title><link rel="stylesheet" href="/static/ticket.css"><link rel="stylesheet" href="/static/site.css">
 <script src="/static/akamai-sensor.js"></script>
-<style>main{max-width:420px;margin:8vh auto;padding:28px;background:white;border-radius:12px;box-shadow:0 8px 30px #0002}label{display:block;margin:16px 0}input{display:block;width:100%;padding:10px;margin-top:5px}#error{color:#b91c1c}</style></head>
-<body><main><h1>Login Gate</h1><p>บัญชีจำลองสำหรับ Defense Lab</p>
+ </head>
+<body class="storefront-page auth-page"><div class="utility-bar"><span>DEFENSE LIVE / LIVE EVENTS</span><span>เว็บไซต์จำลองสำหรับการทดสอบระบบ</span></div>
+<header class="Ticket-header"><a class="ticket-logo" href="/" aria-label="Defense Live หน้าแรก"><div class="ticket-logo-main"><span class="ticket-logo-badge">D</span><span>DEFENSE LIVE</span></div><span class="ticket-logo-sub">TICKETING SIMULATOR</span></a><span class="header-sim-label">SIMULATION</span></header>
+<main class="auth-shell"><div class="auth-photo"><span class="hero-eyebrow">MEMBER SIGN IN</span><h2>ทุกช่วงเวลาดี ๆ เริ่มที่นี่</h2><p>เข้าสู่ระบบเพื่อดำเนินการซื้อบัตรในแล็บจำลอง</p></div><div class="auth-form-panel"><span class="section-kicker">WELCOME BACK</span><h1>เข้าสู่ระบบ</h1><p>ใช้บัญชีจำลองเพื่อดำเนินการต่อ</p>
 <form id="form"><label>อีเมล<input id="email" type="email" required autocomplete="username"></label>
 <label>รหัสผ่าน<input id="password" type="password" required autocomplete="current-password"></label>
-<button class="ticket-btn" type="submit">เข้าสู่ระบบ</button></form><p id="error" role="alert"></p></main>
+<button class="ticket-btn" type="submit">เข้าสู่ระบบ</button></form><p id="error" role="alert"></p></div></main>
+<footer class="Ticket-footer"><span class="footer-brand">DEFENSE LIVE</span><span class="footer-note">ระบบจำลองสำหรับการศึกษาและทดสอบ ไม่มีการขายบัตรจริง</span></footer>
 <script>
 const nextPath = new URLSearchParams(location.search).get("next");
 const next = ["/", "/member-code", "/seats", "/checkout"].includes(nextPath) ? nextPath : "/";

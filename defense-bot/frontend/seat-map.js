@@ -60,20 +60,18 @@
     }
     
     eventConfig.zones.forEach((z) => {
-      const d = document.createElement("div");
+      const d = document.createElement("button");
+      d.type = "button";
       d.id = "zone-" + z.id;
       d.className = "seat available";
       d.dataset.zoneColor = z.color;
-      d.style.backgroundColor = z.color;
-      d.style.borderColor = z.color;
-      d.style.color = "#ffffff";
-      d.style.textShadow = "0 1px 2px rgba(0,0,0,0.4)";
-      const restrictedHtml = z.isRestricted ? '<span style="display:block; font-size: 0.7rem; background: rgba(255,255,255,0.2); color: #fff; padding: 2px 4px; border-radius: 4px; margin-top: 4px;">Restricted View</span>' : '';
+      d.style.setProperty("--zone-color", z.color);
+      const restrictedHtml = z.isRestricted ? '<span class="restricted-view">มุมมองจำกัด</span>' : '';
       
       d.innerHTML =
-        '<span class="seat-label" style="font-size: 1.1rem;">' +
+        '<span class="seat-label">' +
         z.name +
-        '</span><span class="seat-status" style="font-size: 0.95rem; font-weight: 600; margin-top: 4px; display:block;">฿' +
+        '</span><span class="seat-status">฿' +
         z.price.toLocaleString() +
         "</span>" + restrictedHtml;
       
@@ -123,10 +121,7 @@
           if (el) {
             if (s.status === "locked" || s.status === "sold") {
               el.className = "seat held";
-              el.style.backgroundColor = ""; // let css take over
-              el.style.borderColor = "";
-              el.style.color = "";
-              el.style.textShadow = "none";
+              el.disabled = true;
               
               if (selectedSeat === s.seatId) {
                 selectedSeat = null;
@@ -136,18 +131,7 @@
               }
             } else {
               el.className = "seat available" + (selectedSeat === s.seatId ? " selected" : "");
-              const zoneColor = el.dataset.zoneColor || "";
-              if (!selectedSeat || selectedSeat !== s.seatId) {
-                 el.style.backgroundColor = zoneColor;
-                 el.style.borderColor = zoneColor;
-                 el.style.color = "#ffffff";
-                 el.style.textShadow = "0 1px 2px rgba(0,0,0,0.4)";
-              } else {
-                 el.style.backgroundColor = zoneColor; // keeping it same color, just letting CSS handle border
-                 el.style.borderColor = "#ffffff"; // Or strong border
-                 el.style.color = "#ffffff";
-                 el.style.textShadow = "0 1px 2px rgba(0,0,0,0.4)";
-              }
+              el.disabled = false;
             }
           }
         });
@@ -168,7 +152,7 @@
   
   async function performAddToCart() {
     els.btnCheckout.disabled = true;
-    els.statusMsg.textContent = "กำลังล็อกที่นั่ง (ส่ง Telemetry → Fraud Engine)...";
+    els.statusMsg.textContent = "กำลังตรวจสอบและล็อกที่นั่งให้คุณ...";
     DefenseTelemetry.track("seat_select", { seatId: selectedSeat });
     await DefenseTelemetry.flush();
 

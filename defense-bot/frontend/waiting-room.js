@@ -3,7 +3,7 @@
 
   const EVENT = window.ticket_EVENT || {
     id: "demo-concert-2026",
-    name: "BTS WORLD TOUR 'ARIRANG' IN BANGKOK",
+    name: "BANGKOK LIVE EXPERIENCE 2026",
   };
 
   const STORAGE_KEY = "ticket_waiting_room_state";
@@ -697,7 +697,7 @@
   function initCaptchaQuiz() {
     document.getElementById("captcha-quiz").classList.remove("hidden");
     const questions = [
-      { q: "เวทีคอนเสิร์ตครั้งแรกของ BTS ในประเทศไทยคือเวทีคอนเสิร์ตใด", a: "7 สีคอนเสิร์ต", opts: ["BTS WORLD TOUR 'ARIRANG' IN BANGKOK", "BTS WORLD TOUR 'LOVE YOURSELF' BANGKOK", "BTS LIVE TRILOGY EPISODE III THE WINGS TOUR in Bangkok", "7 สีคอนเสิร์ต"] }
+      { q: "งานจำลองนี้จัดขึ้นที่เมืองใด", a: "กรุงเทพฯ", opts: ["เชียงใหม่", "ภูเก็ต", "กรุงเทพฯ", "ขอนแก่น"] }
     ];
     const q = questions[0];
     document.getElementById("quiz-question-text").innerText = q.q;

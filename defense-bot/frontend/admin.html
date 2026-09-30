@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Defense Admin — Swiss Cheese Audit</title>
   <link rel="stylesheet" href="/static/ticket.css" />
+  <link rel="stylesheet" href="/static/site.css" />
   <script src="/static/event-config.js"></script>
   <script src="/static/ticket-ui.js"></script>
   <style>
@@ -134,15 +135,17 @@
     }
   </style>
 </head>
-<body>
+<body class="storefront-page admin-page">
+  <div class="utility-bar"><span>DEFENSE LIVE / CONTROL ROOM</span><span>เว็บไซต์จำลองสำหรับการทดสอบระบบ</span></div>
   <header class="Ticket-header">
-    <div class="ticket-logo">
+    <a class="ticket-logo" href="/" aria-label="Defense Live หน้าแรก">
       <div class="ticket-logo-main">
-        <span class="ticket-logo-badge">Ticket</span>
-        <span>DEFENSE ADMIN</span>
+        <span class="ticket-logo-badge">D</span>
+        <span>DEFENSE LIVE <small>CONTROL</small></span>
       </div>
-      <span class="ticket-logo-sub">Swiss Cheese Model — Live Audit</span>
-    </div>
+      <span class="ticket-logo-sub">SECURITY LAB / LIVE AUDIT</span>
+    </a>
+    <span class="header-sim-label">ADMIN SIMULATION</span>
   </header>
 
   <div class="admin-wrap">

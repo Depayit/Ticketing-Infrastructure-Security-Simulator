@@ -3,23 +3,29 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ThaiTicket Major — Checkout</title>
+  <title>Defense Live — ชำระเงิน</title>
   <link rel="stylesheet" href="/static/ticket.css" />
   <link rel="stylesheet" href="/static/checkout-page.css" />
+  <link rel="stylesheet" href="/static/site.css" />
   <script src="/static/telemetry.js"></script>
   <script src="/static/funnel-guard.js"></script>
   <script src="/static/ticket-ui.js"></script>
 </head>
-<body>
+<body class="storefront-page checkout-page">
+  <div class="utility-bar"><span>DEFENSE LIVE / LIVE EVENTS</span><span>เว็บไซต์จำลองสำหรับการทดสอบระบบ</span></div>
   <header class="Ticket-header">
-    <div class="ticket-logo">
+    <a class="ticket-logo" href="/" aria-label="Defense Live หน้าแรก">
       <div class="ticket-logo-main">
-        <span class="ticket-logo-badge">Ticket</span>
-        <span>THAITICKET MAJOR</span>
+        <span class="ticket-logo-badge">D</span>
+        <span>DEFENSE LIVE</span>
       </div>
-      <span class="ticket-logo-sub">a ticketmaster company</span>
-    </div>
+      <span class="ticket-logo-sub">TICKETING SIMULATOR</span>
+    </a>
+    <nav class="header-nav" aria-label="เมนูหลัก"><span class="nav-current">คอนเสิร์ต</span><span>วิธีซื้อบัตร</span><span class="header-help">ศูนย์ช่วยเหลือ</span></nav>
+    <span class="header-sim-label">SIMULATION</span>
   </header>
+
+  <section class="page-banner checkout-banner"><div class="page-banner-inner"><span class="hero-eyebrow">COMPLETE YOUR ORDER</span><h1>ตรวจสอบและชำระเงิน</h1><p>ตรวจสอบข้อมูลบัตรก่อนยืนยันการสั่งซื้อ</p></div></section>
 
   <!-- ===== Checkout Steps ===== -->
   <div class="checkout-stepper">
@@ -315,7 +321,7 @@
         </div>
         <h2 class="success-title">ชำระเงินสำเร็จ!</h2>
         <p id="order-result" class="success-order-id"></p>
-        <p class="success-msg">ขอบคุณที่ใช้บริการ ThaiTicket Major</p>
+        <p class="success-msg">ขอบคุณที่ใช้บริการ Defense Live ระบบจำลอง</p>
         <a href="/" class="btn-confirm-order btn-back-home">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M3 12l9-9 9 9"/><path d="M9 21V12h6v9"/></svg>
           กลับหน้าแรก
