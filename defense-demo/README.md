@@ -13,6 +13,8 @@ cd defense-demo
 docker compose -f docker-compose.defense.yml up --build
 ```
 
+For a Linux server installation that can be controlled over SSH from another device, see [REMOTE_CLI.md](REMOTE_CLI.md). It adds a `defense-demo` command for starting the lab and running tests.
+
 | URL | หน้า | Defense Layer |
 |-----|------|---------------|
 | http://localhost:8090/ | Waiting Room (Ticket UI) | Edge + WAF + Akamai + Queue-it |

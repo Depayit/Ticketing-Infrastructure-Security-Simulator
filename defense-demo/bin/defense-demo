@@ -1,0 +1,73 @@
+#!/bin/sh
+set -eu
+
+# Resolve symlinks so this command works from ~/.local/bin.
+script=$0
+while [ -L "$script" ]; do
+  target=$(readlink "$script")
+  case "$target" in
+    /*) script=$target ;;
+    *) script=$(dirname "$script")/$target ;;
+  esac
+done
+demo_dir=$(CDPATH= cd -- "$(dirname -- "$script")/.." && pwd)
+compose_file=$demo_dir/docker-compose.defense.yml
+
+usage() {
+  cat <<'EOF'
+Usage: defense-demo <command>
+
+Commands:
+  up       Build and start the Defense Lab
+  status   Show service status
+  health   Check the gateway health endpoint
+  smoke    Run the end-to-end profile smoke test
+  test     Run unit tests
+  loadgen  Run the bounded bot scenarios and write reports/
+  logs     Follow gateway logs
+  down     Stop the Defense Lab
+  help     Show this help
+
+Run this command on the Docker host. Connect to that host over SSH from any device.
+EOF
+}
+
+if [ "$#" -ne 1 ]; then
+  usage >&2
+  exit 2
+fi
+
+case "$1" in
+  up)
+    docker compose -f "$compose_file" up -d --build gateway
+    ;;
+  status)
+    docker compose -f "$compose_file" ps
+    ;;
+  health)
+    docker compose -f "$compose_file" exec -T gateway python -c \
+      'import urllib.request; print(urllib.request.urlopen("http://127.0.0.1:8090/health", timeout=5).read().decode())'
+    ;;
+  smoke)
+    docker compose -f "$compose_file" --profile test run --rm --build lab-smoke
+    ;;
+  test)
+    docker compose -f "$compose_file" --profile test run --rm --build lab-tests
+    ;;
+  loadgen)
+    docker compose -f "$compose_file" --profile loadgen run --rm --build bot-loadgen
+    ;;
+  logs)
+    docker compose -f "$compose_file" logs -f gateway
+    ;;
+  down)
+    docker compose -f "$compose_file" down
+    ;;
+  help|-h|--help)
+    usage
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac
