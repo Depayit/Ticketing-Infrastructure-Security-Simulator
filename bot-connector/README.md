@@ -9,7 +9,7 @@ API Gateway ให้ Bot ที่พัฒนาจากที่อื่น
 docker compose up --build -d bot-connector manager
 
 # ต้องมี defense-demo รันอยู่ด้วย
-cd defense-demo
+cd defense-bot
 docker compose -f docker-compose.defense.yml up -d
 ```
 

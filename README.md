@@ -150,7 +150,7 @@ then start the defense stack:
 
 ```bash
 docker compose up -d --build redis proxy-rotator manager worker
-docker compose -f defense-demo/docker-compose.defense.yml up -d --build
+docker compose -f defense-bot/docker-compose.defense.yml up -d --build
 ```
 
 Open the manager at `http://localhost:8080/` and the defense gateway at
@@ -184,7 +184,7 @@ credentials that are not included in a customer account.
 docker compose up -d --build redis proxy-rotator manager worker
 
 # 2. Start Defense Simulation Stack (Gateway, Queue, Seats, Payment, Fraud Engine)
-docker compose -f defense-demo/docker-compose.defense.yml up -d --build
+docker compose -f defense-bot/docker-compose.defense.yml up -d --build
 ```
 
 ### 3. Start Offense Worker Dashboard (Frontend)

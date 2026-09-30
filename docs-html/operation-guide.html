@@ -70,7 +70,7 @@
           <li class="nav-item"><a href="https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator/tree/main/manager" target="_blank"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> /manager (FastAPI)</a></li>
           <li class="nav-item"><a href="https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator/tree/main/worker" target="_blank"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> /worker (Stealth Bot)</a></li>
           <li class="nav-item"><a href="https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator/tree/main/proxy-rotator" target="_blank"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> /proxy-rotator</a></li>
-          <li class="nav-item"><a href="https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator/tree/main/defense-demo" target="_blank"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> /defense-demo</a></li>
+          <li class="nav-item"><a href="https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator/tree/main/defense-bot" target="_blank"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> /defense-bot</a></li>
           <li class="nav-item"><a href="https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator/tree/main/frontend" target="_blank"><svg class="nav-icon" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> /frontend (Dashboard)</a></li>
         </ul>
       </div>
@@ -90,8 +90,8 @@
           สามารถเปิดใช้งานระบบจำลองความปลอดภัย (Defense Demo) ทั้งหมดได้ผ่าน Docker Compose ด้วยคำสั่งเพียงชุดเดียว:
         </p>
 
-<pre><code># 1. ย้ายเข้าโฟลเดอร์ defense-demo
-cd defense-demo
+<pre><code># 1. ย้ายเข้าโฟลเดอร์ defense-bot
+cd defense-bot
 
 # 2. เริ่มต้นรันบริการทั้งหมด (Edge WAF, Akamai, Queue-it, AI Fraud Engine, Seat, Payment)
 docker compose -f docker-compose.defense.yml up --build</code></pre>

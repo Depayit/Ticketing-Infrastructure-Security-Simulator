@@ -9,7 +9,7 @@ The admin Event Config dialog switches Workflow Profiles A–D at runtime. Profi
 ## Quick Start (Docker)
 
 ```bash
-cd defense-demo
+cd defense-bot
 docker compose -f docker-compose.defense.yml up --build
 ```
 

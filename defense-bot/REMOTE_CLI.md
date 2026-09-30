@@ -7,10 +7,10 @@ Run the Defense Lab on a Linux server with Git, Docker, and the Docker Compose p
 ```sh
 git clone --filter=blob:none --sparse https://github.com/Depayit/Ticketing-Infrastructure-Security-Simulator.git
 cd Ticketing-Infrastructure-Security-Simulator
-git sparse-checkout set defense-demo
+git sparse-checkout set defense-bot
 mkdir -p "$HOME/.local/bin"
-chmod +x defense-demo/bin/defense-demo
-ln -s "$(pwd)/defense-demo/bin/defense-demo" "$HOME/.local/bin/defense-demo"
+chmod +x defense-bot/bin/defense-demo
+ln -s "$(pwd)/defense-bot/bin/defense-demo" "$HOME/.local/bin/defense-demo"
 ```
 
 If `~/.local/bin` is not in your `PATH`, run `export PATH="$HOME/.local/bin:$PATH"` in the current shell and add that line to your shell profile for future sessions. The checkout must be accessible to the account running the CLI. A private GitHub repository requires Git credentials on the server.
@@ -26,7 +26,7 @@ defense-demo loadgen
 defense-demo down
 ```
 
-`up` starts the gateway and its Redis, queue, seat, payment, and fraud dependencies. `loadgen` runs only against the gateway within the same Compose network. Its JSON results are saved in `defense-demo/reports/`. Use `SCENARIO_PACK=medium defense-demo loadgen` for the bounded medium scenario pack; see [SCENARIOS.md](SCENARIOS.md) for the scenario definitions.
+`up` starts the gateway and its Redis, queue, seat, payment, and fraud dependencies. `loadgen` runs only against the gateway within the same Compose network. Its JSON results are saved in `defense-bot/reports/`. Use `SCENARIO_PACK=medium defense-demo loadgen` for the bounded medium scenario pack; see [SCENARIOS.md](SCENARIOS.md) for the scenario definitions.
 
 To update the installation:
 

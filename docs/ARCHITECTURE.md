@@ -48,7 +48,7 @@ The root `docker-compose.yml` currently defines:
 
 The frontend is compiled in the manager Docker build and served as static dashboard assets.
 
-`defense-demo` and `bot-connector` are present in the repository, but they should not be described as root Compose services unless / until they are wired into that runtime configuration.
+`defense-bot` and `bot-connector` are present in the repository, but they should not be described as root Compose services unless / until they are wired into that runtime configuration.
 
 ## 2. Component responsibilities
 
