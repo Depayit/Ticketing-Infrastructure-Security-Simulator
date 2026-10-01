@@ -14,6 +14,7 @@ from starlette.responses import Response
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from gateway import admin_auth as gateway
+from gateway.public_identity import COOKIE_NAME, public_visitor, valid_visitor
 from shared import event_state
 from shared.event_state import validate_event_update
 from shared.request_identity import client_identity
@@ -64,13 +65,41 @@ class ProductionControlsTests(unittest.TestCase):
                        "headers": [(b"x-forwarded-for", b"1.2.3.4"),
                                    (b"tailscale-user-login", b"tester@example.com")],
                        "client": ("172.18.0.1", 1234), "query_string": b""})
-        with patch.dict("os.environ", {"LAB_MODE": "production"}):
+        with patch.dict("os.environ", {"LAB_MODE": "production", "LAB_ACCESS": "private"}):
             self.assertEqual(client_identity(req), "tailscale:tester@example.com")
         no_identity = Request({"type": "http", "method": "GET", "path": "/", "scheme": "https",
                                "headers": [(b"x-forwarded-for", b"1.2.3.4")],
                                "client": ("172.18.0.1", 1234), "query_string": b""})
-        with patch.dict("os.environ", {"LAB_MODE": "production"}):
+        with patch.dict("os.environ", {"LAB_MODE": "production", "LAB_ACCESS": "private"}):
             self.assertEqual(client_identity(no_identity), "172.18.0.1")
+
+    def test_public_visitors_get_distinct_signed_identities(self):
+        async def identity_response(req):
+            response = Response(client_identity(req))
+            return response
+
+        with patch.dict("os.environ", {"LAB_MODE": "production", "LAB_ACCESS": "public",
+                                           "LAB_ADMIN_PASSWORD": "test-password"}):
+            first = request("/events")
+            first_response = asyncio.run(public_visitor(first, identity_response))
+            cookie = first_response.headers["set-cookie"].split(";", 1)[0].split("=", 1)[1]
+            self.assertTrue(valid_visitor(cookie))
+            self.assertIn("Secure", first_response.headers["set-cookie"])
+            self.assertIn("HttpOnly", first_response.headers["set-cookie"])
+            self.assertEqual(first_response.body.decode(), f"visitor:{valid_visitor(cookie)}")
+
+            second = request("/events")
+            second_response = asyncio.run(public_visitor(second, identity_response))
+            self.assertNotEqual(first_response.body, second_response.body)
+
+            repeated = request("/events")
+            repeated.scope["headers"].append((b"cookie", f"{COOKIE_NAME}={cookie}".encode()))
+            repeated.scope["headers"].extend([(b"tailscale-user-login", b"spoofed@example.com"),
+                                               (b"x-forwarded-for", b"1.2.3.4")])
+            repeated_response = asyncio.run(public_visitor(repeated, identity_response))
+            self.assertEqual(repeated_response.body, first_response.body)
+            self.assertNotIn("set-cookie", repeated_response.headers)
+            self.assertFalse(valid_visitor(cookie[:-1] + ("0" if cookie[-1] != "0" else "1")))
 
     def test_events_have_independent_sale_status(self):
         class RedisStub:

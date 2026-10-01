@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from gateway.admin_auth import admin_auth
+from gateway.public_identity import public_visitor
 
 # --- Resilient imports for incomplete demo modules (added for bot testing) ---
 try:
@@ -97,6 +98,7 @@ if os.getenv("LAB_MODE") != "production":
     app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 app.middleware("http")(admin_auth)
+app.middleware("http")(public_visitor)
 
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
 if FRONTEND.exists():

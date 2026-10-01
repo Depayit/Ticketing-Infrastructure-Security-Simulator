@@ -22,6 +22,7 @@ services:
     command: uvicorn main:app --host 0.0.0.0 --port 8090 --no-proxy-headers
     environment:
       LAB_MODE: production
+      LAB_ACCESS: ${LAB_ACCESS:-private}
       LAB_ADMIN_USER: ${LAB_ADMIN_USER:-admin}
       LAB_ADMIN_PASSWORD: ${LAB_ADMIN_PASSWORD:?Set LAB_ADMIN_PASSWORD in .env.production}
     restart: unless-stopped

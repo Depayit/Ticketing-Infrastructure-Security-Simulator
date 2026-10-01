@@ -1,4 +1,4 @@
-# Private Defense Lab deployment (Debian 13)
+# Defense Lab deployment (Debian 13)
 
 This deployment runs the simulated ticket buyer journey and the admin control room on one VM. It is for lab data only: login, CAPTCHA, bot scoring, payments and OTP are simulations. It does not connect to ThaiTicketMajor or process real payments. The catalog at `/events` supports multiple concurrent events; each has its own queue, seats, prices, ticket limit, sale status and sale-start time. Defense toggles and workflow profiles apply to the whole lab.
 
@@ -6,7 +6,7 @@ This deployment runs the simulated ticket buyer journey and the admin control ro
 
 Install Docker Engine and the Compose plugin using the [official Debian instructions](https://docs.docker.com/engine/install/debian/). Confirm `sudo docker compose version` works. Install Git. Keep SSH access to the VM while making network changes.
 
-Install Tailscale on the VM and on each tester device using the [official Linux instructions](https://tailscale.com/docs/install/linux) (or the matching client for the tester's OS). Join the VM to a tailnet whose access policy permits only the lab team. Check the tailnet policy before inviting testers: the default policy can permit more members than the lab group. A public DNS name is not required. Do not use Tailscale Funnel, which publishes to the internet.
+Install Tailscale on the VM using the [official Linux instructions](https://tailscale.com/docs/install/linux). Private access also requires Tailscale on each tester device. A public DNS name is not required. Choose Serve for private access or Funnel for public testing.
 
 ## 2. Get the application
 
@@ -52,7 +52,7 @@ cd /home/dannyfolderss/Ticketing-Infrastructure-Security-Simulator/defense-bot
 cat .env.production
 ```
 
-## 5. Make the site available only inside the lab network
+## 5. Make the site available inside the lab network
 
 After `sudo tailscale up` has joined the VM to the team's tailnet, run:
 
@@ -62,6 +62,14 @@ tailscale serve status
 ```
 
 Serve displays an HTTPS `*.ts.net` URL accessible only to authorized tailnet members. The tailnet must have HTTPS certificates enabled; the first Serve command may prompt for this in the admin console. Configure Tailscale access policy to limit the VM to the lab group and avoid sharing the device outside that group. Share the Serve URL with testers. `/admin` prompts for the separate admin credentials. Keep the VM firewall closed for ports 8090–8094, 6380, 9090 and 3000; Tailscale Serve reads the gateway locally. The gateway uses Tailscale Serve's authenticated user header for per-tester queue and WAF identity. See [Tailscale Serve](https://tailscale.com/docs/reference/tailscale-cli/serve) and its [identity-header behavior](https://tailscale.com/docs/features/tailscale-serve#identity-headers).
+
+## Public testing with Funnel
+
+For voluntary public testing, set `LAB_ACCESS=public` in `.env.production`, rebuild the gateway, and use `sudo tailscale funnel --bg 8090` in place of Serve on port 443. Funnel may require approval in the Tailscale admin console. Verify `sudo tailscale funnel status` says `Funnel on` and test the URL from a device outside the tailnet. [Funnel](https://tailscale.com/docs/features/tailscale-funnel) allows anyone with the URL to visit without installing Tailscale; it has non-configurable bandwidth limits.
+
+The public gateway assigns a signed, random visitor cookie to keep simulated queues and request controls separate. The cookie can be cleared by a tester, so it is not a strong abuse barrier. Only share simulated data. Buyer login accepts invented credentials and mock OTP; testers must not enter real passwords or payment details. `/admin` remains protected by the separate random admin password over HTTPS. Keep the gateway and internal service ports bound to localhost. Monitor the VM while public testing is active.
+
+To return to private access, set `LAB_ACCESS=private`, rebuild the gateway and run `sudo tailscale serve --bg 8090`; the most recent Serve or Funnel command determines whether port 443 is private or public. To close access entirely, run `sudo tailscale funnel off` and `sudo tailscale serve off`.
 
 ## 6. Acceptance check
 

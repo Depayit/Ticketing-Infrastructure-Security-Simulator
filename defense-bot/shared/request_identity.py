@@ -4,6 +4,9 @@ import os
 
 
 def client_identity(request) -> str:
+    if os.getenv("LAB_ACCESS") == "public":
+        visitor_id = getattr(request.state, "visitor_id", "")
+        return f"visitor:{visitor_id}" if visitor_id else "visitor:unassigned"
     if os.getenv("LAB_MODE") == "production":
         # Tailscale Serve removes supplied identity headers and adds the
         # authenticated user's login. The gateway listens on localhost only.
