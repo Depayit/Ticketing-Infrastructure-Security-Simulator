@@ -1,5 +1,7 @@
+import asyncio
 import json
 import hashlib
+import os
 import sys
 import time
 import uuid
@@ -17,8 +19,15 @@ from shared.events import log_event
 from shared.redis_client import r
 from shared.workflow import auth_user, captcha_passed, captcha_required, get_workflow, sensor_score
 from shared.seat_state import commit_hold, release_hold
+from telegram_notify import delivery_loop, queue_payment_alert
 
 app = FastAPI(title="Payment Service")
+
+
+@app.on_event("startup")
+async def start_telegram_delivery():
+    if os.getenv("TELEGRAM_BOT_TOKEN") and os.getenv("TELEGRAM_CHAT_ID"):
+        asyncio.create_task(delivery_loop())
 
 
 class CheckoutRequest(BaseModel):
@@ -65,6 +74,7 @@ def _commit_order(cart: Dict[str, Any], cart_id: str, session_id: str, ip: str,
     if not commit_hold(cart["event_id"], cart["seat_id"], cart_id, order):
         log_event("payment", "hold_expired_before_commit", session_id, ip, {"cart_id": cart_id}, blocked=True)
         raise HTTPException(status_code=409, detail={"errorCode": "HOLD_EXPIRED"})
+    queue_payment_alert(order)
     return order_id
 
 

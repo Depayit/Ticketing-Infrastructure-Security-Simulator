@@ -71,6 +71,18 @@ The public gateway assigns a signed, random visitor cookie to keep simulated que
 
 To return to private access, set `LAB_ACCESS=private`, rebuild the gateway and run `sudo tailscale serve --bg 8090`; the most recent Serve or Funnel command determines whether port 443 is private or public. To close access entirely, run `sudo tailscale funnel off` and `sudo tailscale serve off`.
 
+## Telegram alerts for simulated payments
+
+Alerts are optional and disabled until both `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are configured. The payment service queues one alert only after a seat/order commit succeeds. This covers mock card payments after 3DS verification, mock QR verification and the 3DS-disabled path. Creating a QR or issuing a 3DS challenge does not send a paid alert. Notifications contain order ID, event ID, seat/zone, quantity, simulated total and method, but no buyer email or card data. Delivery retries from a Redis stream if Telegram is temporarily unavailable; a rare duplicate is possible if Telegram accepts a message just before the worker loses its acknowledgment.
+
+If a bot token was shared in chat, generate a replacement with [@BotFather](https://t.me/BotFather) `/token` before setup. Open the bot's private chat and send `/start`, then run this on the VM through an interactive SSH session:
+
+```sh
+sudo -n -u dannyfolderss python3 /home/dannyfolderss/Ticketing-Infrastructure-Security-Simulator/defense-bot/scripts/configure_telegram.py
+```
+
+The script requests the replacement token with hidden input, validates it with Telegram `getMe`, finds the private Chat ID from `getUpdates`, sends a setup confirmation, writes both values to the owner-only `.env.production`, and recreates only `payment-service`. Do not paste the token into chat or a shell command. If no private chat appears, send `/start` to the bot and rerun the script. `getUpdates` cannot run if the bot has an active webhook. See [Telegram Bot API](https://core.telegram.org/bots/api#getupdates).
+
 ## 6. Acceptance check
 
 From a tester device in the tailnet, open `/events`, select an event and walk through sensor, waiting room, seat lock, checkout and mock 3DS. Open `/admin` with the admin credentials; create events, select one to edit its name, supported zone prices, ticket limit and sale status, or set its sale-start time. `paused` stops new queue entries and seat locks for that event; `sold_out` marks its sales closed. Existing seat holds can complete payment. Workflow and defense settings affect all events. Test one workflow profile at a time.

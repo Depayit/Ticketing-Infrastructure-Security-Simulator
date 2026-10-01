@@ -16,6 +16,9 @@ services:
     restart: unless-stopped
 
   payment-service:
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
     restart: unless-stopped
 
   gateway:
