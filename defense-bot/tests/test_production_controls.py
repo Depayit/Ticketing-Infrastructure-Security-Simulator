@@ -51,6 +51,7 @@ class ProductionControlsTests(unittest.TestCase):
     def test_admin_and_write_apis_require_credentials(self):
         with patch.object(gateway, "ADMIN_PASSWORD", "secret"), patch.object(gateway, "ADMIN_USER", "operator"):
             for path, method in (("/admin", "GET"), ("/static/admin.html", "GET"),
+                                 ("/admin/api/event-import", "POST"),
                                  ("/admin/api/reset-seats", "POST"),
                                  ("/api/event-config", "POST"), ("/api/defense-toggles", "POST")):
                 response = asyncio.run(gateway.admin_auth(request(path, method), allowed))

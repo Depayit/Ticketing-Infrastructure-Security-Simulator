@@ -218,6 +218,18 @@
     <div id="config-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:999; align-items:center; justify-content:center;">
       <div style="background:#fff; width:600px; max-width:90%; border-radius:12px; padding:24px; max-height:90vh; overflow-y:auto;">
         <h2 style="margin-top:0; margin-bottom:16px;">ตั้งค่าอีเวนต์ (Event Config)</h2>
+        <fieldset style="margin-bottom:16px;border:1px solid #ddd;border-radius:8px;">
+          <legend>ตั้งค่าจากลิงก์หน้าอีเวนต์</legend>
+          <label for="cfg-import-url">ลิงก์ ThaiTicketMajor</label>
+          <input id="cfg-import-url" type="url" maxlength="500" placeholder="https://www.thaiticketmajor.com/concert/...html" style="width:100%;padding:8px;margin:8px 0;">
+          <details><summary>ถ้าอ่านลิงก์ไม่ได้: วางข้อความจากหน้าอีเวนต์</summary>
+            <textarea id="cfg-import-text" maxlength="100000" aria-label="ข้อความรายละเอียดจากหน้าอีเวนต์" style="width:100%;height:110px;margin:8px 0;"></textarea>
+          </details>
+          <button type="button" id="cfg-analyze-event" class="btn-config">วิเคราะห์และสรุปการตั้งค่า</button>
+          <pre id="cfg-import-summary" role="status" aria-live="polite" style="white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.7 sans-serif;"></pre>
+          <button type="button" id="cfg-apply-import" class="btn-config" hidden>นำข้อมูลที่พบมาใส่ในฟอร์ม</button>
+          <small style="display:block;margin-top:8px;">ตรวจสอบผลก่อนนำมาใช้ แล้วกดบันทึก ระบบจะไม่ตั้งเวลาเปิดขายจริง</small>
+        </fieldset>
         <button type="button" id="cfg-masterz-preset" class="btn-config">เติมรายละเอียด K-POP MASTERZ 2026</button>
         <p style="font-size:12px;color:#666;">เติมเฉพาะชื่อ สถานที่ วันที่ และลิงก์อ้างอิง กรุณาตรวจสอบผังโซน ราคา และจำนวนบัตรจากผู้จัดก่อนปรับค่าจำลอง กดบันทึกเพื่อใช้ข้อมูล</p>
         <div style="display:grid;gap:10px;margin-bottom:16px;">
@@ -250,6 +262,7 @@
         <fieldset style="margin-bottom:16px; border:1px solid #ddd; border-radius:8px;">
           <legend>Workflow Profile</legend>
           <p style="font-size:12px; color:#666;">Workflow Profile นี้ใช้ร่วมกันทุกอีเวนต์ในแล็บ</p>
+          <p style="font-size:12px;line-height:1.7;">A: เข้าคิว → Login → เลือกที่นั่ง · B: Login → เข้าคิว → เลือกที่นั่ง<br>C: สุ่ม CAPTCHA 25% · D: Login ทุกจุด + สุ่ม CAPTCHA 50% + คิวตามคะแนน<br>custom: กำหนดเอง รายละเอียดหน้าอีเวนต์ไม่ยืนยัน Workflow ของเว็บจริง โปรดเลือกตามสถานการณ์จำลอง</p>
           <label>Profile <select id="cfg-workflow-profile"><option value="custom">custom (ค่าเดิม)</option><option value="A">A — Queue → Login → Seat</option><option value="B">B — Login → Queue → Seat</option><option value="C">C — Random CAPTCHA</option><option value="D">D — Full lockdown</option></select></label>
           <div id="cfg-workflow-custom" style="display:grid; gap:8px; margin-top:12px;">
             <label><input type="checkbox" id="cfg-login-queue"> Login ก่อน Waiting Room</label>
@@ -442,11 +455,19 @@
       } catch (error) { showToast(error.message); }
     });
     const configModal = document.getElementById("config-modal");
+    let importDraft = null;
+    let importRun = 0;
     document.getElementById("btn-config").addEventListener("click", async () => {
       try {
         const res = await fetch("/api/event-config?event_id=" + encodeURIComponent(selectedEventId));
         if (res.ok) {
           currentEventConfig = await res.json();
+          importRun++;
+          importDraft = null;
+          document.getElementById("cfg-import-url").value = currentEventConfig.officialEventUrl || "";
+          document.getElementById("cfg-import-text").value = "";
+          document.getElementById("cfg-import-summary").textContent = "";
+          document.getElementById("cfg-apply-import").hidden = true;
           document.getElementById("cfg-event-name").value = currentEventConfig.eventName || "";
           document.getElementById("cfg-venue").value = currentEventConfig.venue || "";
           document.getElementById("cfg-show-date").value = currentEventConfig.showDate || "";
@@ -473,7 +494,71 @@
     });
     
     document.getElementById("btn-close-config").addEventListener("click", () => {
+      importRun++;
       configModal.style.display = "none";
+    });
+    const importFields = {eventName:"cfg-event-name", venue:"cfg-venue", showDate:"cfg-show-date",
+      officialEventUrl:"cfg-official-url", maxTicketsPerAccount:"cfg-max-tickets"};
+    document.getElementById("cfg-analyze-event").addEventListener("click", async () => {
+      const button = document.getElementById("cfg-analyze-event");
+      const summary = document.getElementById("cfg-import-summary");
+      const run = ++importRun;
+      const eventId = selectedEventId;
+      button.disabled = true;
+      importDraft = null;
+      document.getElementById("cfg-apply-import").hidden = true;
+      summary.textContent = "กำลังอ่านรายละเอียดอีเวนต์...";
+      try {
+        const response = await fetch("/admin/api/event-import", {method:"POST",
+          headers:{"Content-Type":"application/json"}, body:JSON.stringify({
+            url:document.getElementById("cfg-import-url").value.trim(),
+            text:document.getElementById("cfg-import-text").value.trim()})});
+        const result = await response.json();
+        if (run !== importRun || eventId !== selectedEventId) return;
+        if (!response.ok) throw new Error(result.detail || "วิเคราะห์ไม่สำเร็จ");
+        importDraft = result.draft;
+        const labels = {eventName:"ชื่ออีเวนต์", venue:"สถานที่", showDate:"วันแสดง",
+          officialEventUrl:"ลิงก์อ้างอิง", maxTicketsPerAccount:"จำนวนบัตรสูงสุดต่อบัญชี"};
+        const modes = {live:"อ่านจากหน้าเว็บ", pasted:"ข้อความที่คุณวาง", reference:"ข้อมูลอ้างอิงเดิม", unavailable:"อ่านหน้าเว็บไม่ได้"};
+        const lines = ["แหล่งข้อมูล: " + modes[result.sourceMode], "อีเวนต์ที่กำลังตั้งค่า: " + eventId, ""];
+        const profile = document.getElementById("cfg-workflow-profile").value;
+        const effectiveWorkflow = profile === "custom" ? {
+          REQUIRE_LOGIN_BEFORE_QUEUE: document.getElementById("cfg-login-queue").checked,
+          REQUIRE_LOGIN_BEFORE_SEAT: document.getElementById("cfg-login-seat").checked,
+          REQUIRE_LOGIN_BEFORE_LOCK: document.getElementById("cfg-login-lock").checked,
+          CAPTCHA_POSITION: document.getElementById("cfg-captcha-position").value,
+          CAPTCHA_RANDOM_RATE: Number(document.getElementById("cfg-captcha-rate").value),
+          QUEUE_MODE: document.getElementById("cfg-queue-mode").value
+        } : result.workflowProfiles[profile];
+        for (const [field, label] of Object.entries(labels)) {
+          lines.push(label + ": " + (result.draft[field] ?? "ไม่พบ — คงค่าในฟอร์มเดิม"));
+          if (result.evidence[field]) lines.push("  หลักฐาน: " + result.evidence[field]);
+        }
+        lines.push("", "ราคาที่พบ (บาท): " + (result.ticketPrices.join(" / ") || "ไม่พบ"),
+          "ราคาเป็นข้อมูลอ้างอิง ยังไม่จับคู่กับโซนจำลอง", "", "ค่าจำลองที่จะคงไว้:",
+          "สถานะขาย: " + document.getElementById("cfg-sale-status").value,
+          "โซนและราคา: " + document.getElementById("cfg-zones-json").value,
+          "Workflow Profile: " + document.getElementById("cfg-workflow-profile").value,
+          "Login ก่อนคิว: " + effectiveWorkflow.REQUIRE_LOGIN_BEFORE_QUEUE,
+          "Login ก่อนเลือกที่นั่ง: " + effectiveWorkflow.REQUIRE_LOGIN_BEFORE_SEAT,
+          "Login ก่อนล็อกที่นั่ง: " + effectiveWorkflow.REQUIRE_LOGIN_BEFORE_LOCK,
+          "CAPTCHA: " + effectiveWorkflow.CAPTCHA_POSITION,
+          "อัตราสุ่ม CAPTCHA: " + effectiveWorkflow.CAPTCHA_RANDOM_RATE * 100 + "%",
+          "รูปแบบคิว: " + effectiveWorkflow.QUEUE_MODE,
+          "Workflow นี้มีผลกับทุกอีเวนต์ในแล็บ ไม่ได้อนุมานจากเว็บไซต์จริง",
+          "", ...result.warnings);
+        summary.textContent = lines.join("\n");
+        document.getElementById("cfg-apply-import").hidden = !Object.keys(result.draft).some(key => key !== "officialEventUrl");
+      } catch (error) {
+        if (run === importRun) summary.textContent = error.message;
+      } finally { button.disabled = false; }
+    });
+    document.getElementById("cfg-apply-import").addEventListener("click", () => {
+      if (!importDraft) return;
+      for (const [field, id] of Object.entries(importFields)) {
+        if (field in importDraft) document.getElementById(id).value = importDraft[field];
+      }
+      showToast("เติมข้อมูลแล้ว กรุณาตรวจสอบและกดบันทึก");
     });
     document.getElementById("cfg-masterz-preset").addEventListener("click", () => {
       document.getElementById("cfg-event-name").value = "2026 K-POP MASTERZ SPECIAL LIVE IN BANGKOK BAMBAM × JAY B × MARK";

@@ -16,6 +16,7 @@ from pydantic import BaseModel
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from gateway.admin_auth import admin_auth
 from gateway.public_identity import public_visitor
+from gateway.event_import import analyze_event, MAX_BYTES
 
 # --- Resilient imports for incomplete demo modules (added for bot testing) ---
 try:
@@ -270,6 +271,27 @@ def event_catalog():
 @app.get("/admin/api/catalog")
 def admin_catalog():
     return {"events": list_events()}
+
+
+@app.post("/admin/api/event-import")
+async def import_event_details(request: Request):
+    raw = await request.body()
+    if len(raw) > MAX_BYTES:
+        raise HTTPException(413, "รายละเอียดมีขนาดใหญ่เกินไป")
+    try:
+        body = json.loads(raw)
+        if not isinstance(body, dict) or set(body) - {"url", "text"}:
+            raise ValueError("ข้อมูลต้องมี url และ text เท่านั้น")
+        text = body.get("text", "")
+        if not isinstance(text, str):
+            raise ValueError("text ต้องเป็นข้อความ")
+        result = await analyze_event(body.get("url"), text)
+        result["draft"] = validate_event_update(result["draft"])
+        result["workflowProfiles"] = {profile: normalize_workflow({"WORKFLOW_PROFILE": profile})
+                                      for profile in ("A", "B", "C", "D")}
+        return result
+    except (ValueError, RecursionError) as exc:
+        raise HTTPException(422, str(exc)) from exc
 
 
 @app.post("/admin/api/catalog", status_code=201)
