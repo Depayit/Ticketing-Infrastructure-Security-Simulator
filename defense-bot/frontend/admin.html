@@ -166,7 +166,7 @@
         <input id="new-event-name" type="text" maxlength="120" placeholder="ชื่ออีเวนต์ใหม่" style="flex:2; min-width:190px; padding:10px; border:1px solid #ccc; border-radius:6px;" />
         <button type="button" id="btn-create-event" class="btn-config">+ เพิ่มอีเวนต์</button>
       </div>
-      <small>แต่ละอีเวนต์มีคิว ที่นั่ง ราคา สถานะขาย และเวลาเปิดขายของตนเอง ระบบป้องกันและ Workflow Profile เป็นค่าร่วมของแล็บ</small>
+      <small>แต่ละอีเวนต์มีคิว ที่นั่ง ราคา และสถานะขายของตนเอง ระบบป้องกันและ Workflow Profile เป็นค่าร่วมของแล็บ</small>
     </section>
 
     <div class="admin-toolbar">
@@ -218,6 +218,14 @@
     <div id="config-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:999; align-items:center; justify-content:center;">
       <div style="background:#fff; width:600px; max-width:90%; border-radius:12px; padding:24px; max-height:90vh; overflow-y:auto;">
         <h2 style="margin-top:0; margin-bottom:16px;">ตั้งค่าอีเวนต์ (Event Config)</h2>
+        <button type="button" id="cfg-masterz-preset" class="btn-config">เติมรายละเอียด K-POP MASTERZ 2026</button>
+        <p style="font-size:12px;color:#666;">เติมเฉพาะชื่อ สถานที่ วันที่ และลิงก์อ้างอิง กรุณาตรวจสอบผังโซน ราคา และจำนวนบัตรจากผู้จัดก่อนปรับค่าจำลอง กดบันทึกเพื่อใช้ข้อมูล</p>
+        <div style="display:grid;gap:10px;margin-bottom:16px;">
+          <label>สถานที่แสดง <input id="cfg-venue" type="text" maxlength="500" style="width:100%;padding:8px;"></label>
+          <label>วันแสดง <input id="cfg-show-date" type="date" style="width:100%;padding:8px;"></label>
+          <label>ลิงก์หน้าอีเวนต์จริง <input id="cfg-official-url" type="url" maxlength="500" style="width:100%;padding:8px;"></label>
+          <small>การเปิดคิวจำลองควบคุมผ่านสถานะการขายและปุ่มเปิดคิว</small>
+        </div>
         <div style="margin-bottom:12px;">
           <label style="display:block; font-weight:bold; margin-bottom:4px;">Event Name</label>
           <input type="text" id="cfg-event-name" style="width:100%; padding:8px; border:1px solid #ccc; border-radius:4px;" />
@@ -440,6 +448,9 @@
         if (res.ok) {
           currentEventConfig = await res.json();
           document.getElementById("cfg-event-name").value = currentEventConfig.eventName || "";
+          document.getElementById("cfg-venue").value = currentEventConfig.venue || "";
+          document.getElementById("cfg-show-date").value = currentEventConfig.showDate || "";
+          document.getElementById("cfg-official-url").value = currentEventConfig.officialEventUrl || "";
           document.getElementById("cfg-sale-status").value = currentEventConfig.saleStatus || "open";
           document.getElementById("cfg-max-tickets").value = currentEventConfig.maxTicketsPerAccount || 4;
           document.getElementById("cfg-zones-json").value = JSON.stringify(currentEventConfig.zones || [], null, 2);
@@ -463,6 +474,12 @@
     
     document.getElementById("btn-close-config").addEventListener("click", () => {
       configModal.style.display = "none";
+    });
+    document.getElementById("cfg-masterz-preset").addEventListener("click", () => {
+      document.getElementById("cfg-event-name").value = "2026 K-POP MASTERZ SPECIAL LIVE IN BANGKOK BAMBAM × JAY B × MARK";
+      document.getElementById("cfg-venue").value = "ธันเดอร์โดม สเตเดียม";
+      document.getElementById("cfg-show-date").value = "2026-11-14";
+      document.getElementById("cfg-official-url").value = "https://www.thaiticketmajor.com/concert/2026-k-pop-masterz-special-live-in-bangkok-bambam-mark-jayb.html";
     });
     document.getElementById("cfg-workflow-profile").addEventListener("change", (event) => {
       document.getElementById("cfg-workflow-custom").hidden = event.target.value !== "custom";
@@ -488,6 +505,9 @@
         const payload = {
           eventId: selectedEventId,
           eventName,
+          venue: document.getElementById("cfg-venue").value,
+          showDate: document.getElementById("cfg-show-date").value,
+          officialEventUrl: document.getElementById("cfg-official-url").value,
           saleStatus,
           maxTicketsPerAccount: maxTickets,
           zones,
@@ -624,7 +644,7 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ delay_seconds: 60, event_id: selectedEventId })
         });
-        if (res.ok) showToast("ตั้งเวลาเปิดขายล่วงหน้า 1 นาทีแล้ว (Pre-Queue)");
+        if (res.ok) showToast("ตั้งเวลาเปิดคิวจำลองล่วงหน้า 1 นาทีแล้ว (Pre-Queue)");
       } catch (e) {
         showToast("ตั้งเวลาไม่สำเร็จ: " + e.message);
       }

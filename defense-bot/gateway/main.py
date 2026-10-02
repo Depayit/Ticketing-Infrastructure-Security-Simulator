@@ -260,6 +260,9 @@ def admin_events(limit: int = 100):
 def event_catalog():
     return {"events": [{"eventId": event["eventId"], "eventName": event["eventName"],
                         "saleStatus": event.get("saleStatus", "open"),
+                        "venue": event.get("venue", ""),
+                        "showDate": event.get("showDate", ""),
+                        "officialEventUrl": event.get("officialEventUrl", ""),
                         "startingPrice": min(zone["price"] for zone in event["zones"])}
                        for event in list_events()]}
 

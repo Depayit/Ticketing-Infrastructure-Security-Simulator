@@ -32,6 +32,16 @@
         const price = document.createElement("p"); price.textContent = "เริ่มต้น ฿" + event.startingPrice.toLocaleString("th-TH");
         const link = document.createElement("a"); link.className = "ticket-btn"; link.href = "/?eventId=" + encodeURIComponent(event.eventId); link.textContent = "ดูอีเวนต์";
         card.append(title, status, price, link);
+        const details = document.createElement("p");
+        details.textContent = [event.venue, event.showDate && "วันแสดง " + event.showDate].filter(Boolean).join(" · ");
+        card.insertBefore(details, price);
+        if (event.officialEventUrl) {
+          const official = document.createElement("a");
+          official.href = event.officialEventUrl; official.target = "_blank"; official.rel = "noopener noreferrer";
+          official.textContent = "รายละเอียดจาก ThaiTicketMajor";
+          official.style.cssText = "display:block;margin-top:12px";
+          card.append(official);
+        }
         return card;
       }));
     }).catch(error => document.getElementById("event-list").textContent = error.message);

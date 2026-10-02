@@ -2,6 +2,8 @@
 
 import json
 import re
+from datetime import date
+from urllib.parse import urlparse
 
 from shared.config import DEFAULT_EVENT_ID, DEFAULT_EVENT_NAME
 from shared.redis_client import r
@@ -61,11 +63,36 @@ def sale_status(event_id: str = DEFAULT_EVENT_ID) -> str:
 
 
 def validate_event_update(data: dict) -> dict:
-    allowed = {"eventName", "maxTicketsPerAccount", "zones", "saleStatus"}
+    allowed = {"eventName", "maxTicketsPerAccount", "zones", "saleStatus",
+               "venue", "showDate", "officialEventUrl"}
     unknown = set(data) - allowed
     if unknown:
         raise ValueError(f"unknown event fields: {', '.join(sorted(unknown))}")
     result = {}
+    for field in ("venue", "showDate", "officialEventUrl"):
+        if field not in data:
+            continue
+        value = data[field]
+        if not isinstance(value, str) or len(value) > 500:
+            raise ValueError(f"{field} must be a string of at most 500 characters")
+        value = value.strip()
+        if value:
+            if field == "showDate":
+                try:
+                    date.fromisoformat(value)
+                except ValueError as exc:
+                    raise ValueError("showDate must be an ISO date") from exc
+            elif field == "officialEventUrl":
+                try:
+                    parsed = urlparse(value)
+                    valid = (parsed.scheme == "https" and parsed.hostname in
+                             {"www.thaiticketmajor.com", "thaiticketmajor.com", "event.thaiticketmajor.com"}
+                             and not parsed.username and not parsed.password and parsed.port in {None, 443})
+                except ValueError:
+                    valid = False
+                if not valid:
+                    raise ValueError("officialEventUrl must be an HTTPS ThaiTicketMajor URL")
+        result[field] = value
     if "eventName" in data:
         name = data["eventName"]
         if not isinstance(name, str) or not 1 <= len(name.strip()) <= 120:

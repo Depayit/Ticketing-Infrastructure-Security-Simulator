@@ -35,6 +35,19 @@ async def allowed(_request):
 
 
 class ProductionControlsTests(unittest.TestCase):
+    def test_event_metadata_validation(self):
+        metadata = {"venue": "Thunder Dome Stadium", "showDate": "2026-11-14",
+
+                    "officialEventUrl": "https://www.thaiticketmajor.com/concert/example.html"}
+        self.assertEqual(validate_event_update(metadata), metadata)
+        for field, value in (("showDate", "2026-02-30"),
+                             ("saleStartsAt", "2026-10-03T10:00:00"),
+                             ("officialEventUrl", "javascript:alert(1)"),
+                             ("officialEventUrl", "https://www.thaiticketmajor.com.evil.test/")):
+            with self.assertRaises(ValueError):
+                validate_event_update({field: value})
+        self.assertEqual(validate_event_update({"venue": ""}), {"venue": ""})
+
     def test_admin_and_write_apis_require_credentials(self):
         with patch.object(gateway, "ADMIN_PASSWORD", "secret"), patch.object(gateway, "ADMIN_USER", "operator"):
             for path, method in (("/admin", "GET"), ("/static/admin.html", "GET"),

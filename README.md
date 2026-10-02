@@ -174,6 +174,14 @@ destination. Direct booking integration requires a provider-authorized API and
 credentials that are not included in a customer account.
 
 ### 1. Prerequisites
+
+Event details can be edited in the defense admin at `/admin` → **Event Config**.
+The **เติมรายละเอียด K-POP MASTERZ 2026** button fills the event name, venue,
+show date (14 November 2026), and the official reference URL. Review the values and click Save to apply
+them to the selected lab event. These details appear in `/events`.
+Queue opening remains controlled by the existing queue controls and sale status. Zone prices, seat layout, and purchase
+limits retain their lab values until the operator verifies and edits them.
+Source: [ThaiTicketMajor event listing](https://event.thaiticketmajor.com/index.php?la=en).
 * [Docker](https://www.docker.com/) & Docker Compose
 * [Node.js](https://nodejs.org/) (v18+ for local frontend dashboard)
 * [Python 3.11+](https://www.python.org/)
